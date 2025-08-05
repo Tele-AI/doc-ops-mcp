@@ -174,61 +174,150 @@ class EnhancedMammothConverter {
   }
 
   /**
+   * 设置样式属性的辅助方法
+   */
+  private setStyleProperty(styleObj: any, property: string, value: string) {
+    styleObj.css[property] = value;
+    styleObj.mammothMap[property] = value;
+  }
+
+  /**
+   * 处理间距属性
+   */
+  private processSpacing(spacing: any, styleObj: any) {
+    if (spacing.before) {
+      this.setStyleProperty(styleObj, 'marginTop', `${spacing.before / 20}pt`);
+    }
+    if (spacing.after) {
+      this.setStyleProperty(styleObj, 'marginBottom', `${spacing.after / 20}pt`);
+    }
+    if (spacing.line) {
+      const lineHeight = spacing.lineRule === 'exact' 
+        ? `${spacing.line / 240}pt` 
+        : (spacing.line / 240).toString();
+      this.setStyleProperty(styleObj, 'lineHeight', lineHeight);
+    }
+  }
+
+  /**
+   * 处理对齐属性
+   */
+  private processAlignment(align: string, styleObj: any) {
+    const alignMap = { left: 'left', center: 'center', right: 'right', both: 'justify' };
+    this.setStyleProperty(styleObj, 'textAlign', alignMap[align] || 'left');
+  }
+
+  /**
+   * 处理缩进属性
+   */
+  private processIndentation(ind: any, styleObj: any) {
+    if (ind.left) {
+      this.setStyleProperty(styleObj, 'marginLeft', `${ind.left / 20}pt`);
+    }
+    if (ind.right) {
+      this.setStyleProperty(styleObj, 'marginRight', `${ind.right / 20}pt`);
+    }
+    if (ind.firstLine) {
+      this.setStyleProperty(styleObj, 'textIndent', `${ind.firstLine / 20}pt`);
+    }
+    if (ind.hanging) {
+      this.setStyleProperty(styleObj, 'textIndent', `-${ind.hanging / 20}pt`);
+    }
+  }
+
+  /**
    * 解析段落属性
    */
   parseParagraphProperties(pPr, styleObj) {
-    const css = styleObj.css;
-    const mammoth = styleObj.mammothMap;
-
     // 间距
     if (pPr['w:spacing']) {
-      const spacing = pPr['w:spacing'][0].$;
-      if (spacing.before) {
-        css.marginTop = `${spacing.before / 20}pt`;
-        mammoth.marginTop = `${spacing.before / 20}pt`;
-      }
-      if (spacing.after) {
-        css.marginBottom = `${spacing.after / 20}pt`;
-        mammoth.marginBottom = `${spacing.after / 20}pt`;
-      }
-      if (spacing.line) {
-        if (spacing.lineRule === 'exact') {
-          css.lineHeight = `${spacing.line / 240}pt`;
-          mammoth.lineHeight = `${spacing.line / 240}pt`;
-        } else {
-          css.lineHeight = (spacing.line / 240).toString();
-          mammoth.lineHeight = (spacing.line / 240).toString();
-        }
-      }
+      this.processSpacing(pPr['w:spacing'][0].$, styleObj);
     }
 
     // 对齐
     if (pPr['w:jc']) {
-      const align = pPr['w:jc'][0].$.val;
-      const alignMap = { left: 'left', center: 'center', right: 'right', both: 'justify' };
-      css.textAlign = alignMap[align] || 'left';
-      mammoth.textAlign = alignMap[align] || 'left';
+      this.processAlignment(pPr['w:jc'][0].$.val, styleObj);
     }
 
     // 缩进
     if (pPr['w:ind']) {
-      const ind = pPr['w:ind'][0].$;
-      if (ind.left) {
-        css.marginLeft = `${ind.left / 20}pt`;
-        mammoth.marginLeft = `${ind.left / 20}pt`;
-      }
-      if (ind.right) {
-        css.marginRight = `${ind.right / 20}pt`;
-        mammoth.marginRight = `${ind.right / 20}pt`;
-      }
-      if (ind.firstLine) {
-        css.textIndent = `${ind.firstLine / 20}pt`;
-        mammoth.textIndent = `${ind.firstLine / 20}pt`;
-      }
-      if (ind.hanging) {
-        css.textIndent = `-${ind.hanging / 20}pt`;
-        mammoth.textIndent = `-${ind.hanging / 20}pt`;
-      }
+      this.processIndentation(pPr['w:ind'][0].$, styleObj);
+    }
+  }
+
+  /**
+   * 处理字体属性
+   */
+  private processFontFamily(fonts: any, styleObj: any) {
+    const fontFamily = `"${fonts.ascii || fonts.hAnsi || 'Calibri'}", sans-serif`;
+    this.setStyleProperty(styleObj, 'fontFamily', fontFamily);
+  }
+
+  /**
+   * 处理字号属性
+   */
+  private processFontSize(size: number, styleObj: any) {
+    const fontSize = `${size / 2}pt`;
+    this.setStyleProperty(styleObj, 'fontSize', fontSize);
+  }
+
+  /**
+   * 处理文字颜色
+   */
+  private processTextColor(color: string, styleObj: any) {
+    if (color !== 'auto') {
+      this.setStyleProperty(styleObj, 'color', `#${color}`);
+    }
+  }
+
+  /**
+   * 获取高亮颜色映射
+   */
+  private getHighlightColorMap() {
+    return {
+      yellow: '#FFFF00',
+      green: '#00FF00',
+      cyan: '#00FFFF',
+      magenta: '#FF00FF',
+      blue: '#0000FF',
+      red: '#FF0000',
+      darkBlue: '#000080',
+      darkCyan: '#008080',
+      darkGreen: '#008000',
+      darkMagenta: '#800080',
+      darkRed: '#800000',
+      darkYellow: '#808000',
+      darkGray: '#808080',
+      lightGray: '#C0C0C0',
+      black: '#000000',
+    };
+  }
+
+  /**
+   * 处理背景色/高亮
+   */
+  private processHighlight(highlight: string, styleObj: any) {
+    const colorMap = this.getHighlightColorMap();
+    if (colorMap[highlight]) {
+      this.setStyleProperty(styleObj, 'backgroundColor', colorMap[highlight]);
+    }
+  }
+
+  /**
+   * 处理阴影背景
+   */
+  private processShading(shd: any, styleObj: any) {
+    if (shd.fill && shd.fill !== 'auto') {
+      this.setStyleProperty(styleObj, 'backgroundColor', `#${shd.fill}`);
+    }
+  }
+
+  /**
+   * 处理下划线
+   */
+  private processUnderline(uType: string, styleObj: any) {
+    if (uType === 'single' || uType === 'thick' || uType === 'double') {
+      this.setStyleProperty(styleObj, 'textDecoration', 'underline');
     }
   }
 
@@ -236,93 +325,49 @@ class EnhancedMammothConverter {
    * 解析文字属性
    */
   parseRunProperties(rPr, styleObj) {
-    const css = styleObj.css;
-    const mammoth = styleObj.mammothMap;
-
     // 字体
     if (rPr['w:rFonts']) {
-      const fonts = rPr['w:rFonts'][0].$;
-      const fontFamily = `"${fonts.ascii || fonts.hAnsi || 'Calibri'}", sans-serif`;
-      css.fontFamily = fontFamily;
-      mammoth.fontFamily = fontFamily;
+      this.processFontFamily(rPr['w:rFonts'][0].$, styleObj);
     }
 
     // 字号
     if (rPr['w:sz']) {
-      const fontSize = `${rPr['w:sz'][0].$.val / 2}pt`;
-      css.fontSize = fontSize;
-      mammoth.fontSize = fontSize;
+      this.processFontSize(rPr['w:sz'][0].$.val, styleObj);
     }
 
     // 颜色
     if (rPr['w:color']) {
-      const color = rPr['w:color'][0].$.val;
-      if (color !== 'auto') {
-        css.color = `#${color}`;
-        mammoth.color = `#${color}`;
-      }
+      this.processTextColor(rPr['w:color'][0].$.val, styleObj);
     }
 
     // 背景色/高亮
     if (rPr['w:highlight']) {
-      const highlight = rPr['w:highlight'][0].$.val;
-      const colorMap = {
-        yellow: '#FFFF00',
-        green: '#00FF00',
-        cyan: '#00FFFF',
-        magenta: '#FF00FF',
-        blue: '#0000FF',
-        red: '#FF0000',
-        darkBlue: '#000080',
-        darkCyan: '#008080',
-        darkGreen: '#008000',
-        darkMagenta: '#800080',
-        darkRed: '#800000',
-        darkYellow: '#808000',
-        darkGray: '#808080',
-        lightGray: '#C0C0C0',
-        black: '#000000',
-      };
-      if (colorMap[highlight]) {
-        css.backgroundColor = colorMap[highlight];
-        mammoth.backgroundColor = colorMap[highlight];
-      }
+      this.processHighlight(rPr['w:highlight'][0].$.val, styleObj);
     }
 
     // 阴影背景
     if (rPr['w:shd']) {
-      const shd = rPr['w:shd'][0].$;
-      if (shd.fill && shd.fill !== 'auto') {
-        css.backgroundColor = `#${shd.fill}`;
-        mammoth.backgroundColor = `#${shd.fill}`;
-      }
+      this.processShading(rPr['w:shd'][0].$, styleObj);
     }
 
     // 粗体
     if (rPr['w:b']) {
-      css.fontWeight = 'bold';
-      mammoth.fontWeight = 'bold';
+      this.setStyleProperty(styleObj, 'fontWeight', 'bold');
     }
 
     // 斜体
     if (rPr['w:i']) {
-      css.fontStyle = 'italic';
-      mammoth.fontStyle = 'italic';
+      this.setStyleProperty(styleObj, 'fontStyle', 'italic');
     }
 
     // 下划线
     if (rPr['w:u']) {
-      const uType = rPr['w:u'][0].$.val;
-      if (uType === 'single' || uType === 'thick' || uType === 'double') {
-        css.textDecoration = 'underline';
-        mammoth.textDecoration = 'underline';
-      }
+      this.processUnderline(rPr['w:u'][0].$.val, styleObj);
     }
 
     // 删除线
     if (rPr['w:strike']) {
-      css.textDecoration = 'line-through';
-      mammoth.textDecoration = 'line-through';
+      this.setStyleProperty(styleObj, 'textDecoration', 'line-through');
     }
   }
 

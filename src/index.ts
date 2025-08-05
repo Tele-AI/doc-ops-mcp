@@ -1081,195 +1081,199 @@ async function fallbackConvertDocxToPdf(inputPath: string, outputPath?: string, 
   const finalOutputPath = resolveFallbackOutputPath(inputPath, outputPath);
   
   logFallbackConversionStart(docxPath, finalOutputPath);
-
-  // Ensure output directory exists
   await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
 
-  let perfectWordHtml = '';
-  let tempHtmlPath = '';
-
-  // 尝试使用双重解析引擎
-  const dualResult = await tryDualParsingEngine(docxPath);
-  if (dualResult.success && dualResult.content) {
-    perfectWordHtml = dualResult.content;
-  } else {
-    // 如果双重解析失败，使用增强型 mammoth
-    const enhancedResult = await tryEnhancedMammoth(docxPath);
-    if (enhancedResult.success && enhancedResult.content) {
-      perfectWordHtml = enhancedResult.content;
-    } else {
-      // 最终回退
-      perfectWordHtml = await useBasicMammothFallback(docxPath, options);
-    }
-  }
-
+  // 生成HTML内容
+  const perfectWordHtml = await generateHtmlContent(docxPath, options);
   console.error(`🎨 HTML 生成完成 (长度: ${perfectWordHtml.length})`);
 
-  // 确保样式完整性
-  let finalHtml = perfectWordHtml;
+  // 处理样式和HTML结构
+  const finalHtml = await processHtmlStyles(perfectWordHtml, options);
+  
+  // 创建临时文件并验证
+  const tempHtmlPath = await createAndValidateHtmlFile(finalHtml, options);
+  
+  // 返回Playwright指令
+  return createPlaywrightInstructions(finalOutputPath, tempHtmlPath, options);
+}
 
+// 生成HTML内容的辅助函数
+async function generateHtmlContent(docxPath: string, options: any): Promise<string> {
+  const dualResult = await tryDualParsingEngine(docxPath);
+  if (dualResult.success && dualResult.content) {
+    return dualResult.content;
+  }
+  
+  const enhancedResult = await tryEnhancedMammoth(docxPath);
+  if (enhancedResult.success && enhancedResult.content) {
+    return enhancedResult.content;
+  }
+  
+  return await useBasicMammothFallback(docxPath, options);
+}
+
+// 处理HTML样式的辅助函数
+async function processHtmlStyles(html: string, options: any): Promise<string> {
+  let finalHtml = html;
+  
   // 确保包含完整的Word样式
   if (!finalHtml.includes('<style>')) {
-    console.error('⚠️ 检测到样式缺失，强制注入Word样式...');
-
-    // 安全地提取现有内容并包装完整的HTML结构
-    const contentWithoutWrapper = finalHtml
-      .replace(/<!DOCTYPE[^>]*>/gi, '')
-      .replace(/<html[^>]*>/gi, '')
-      .replace(/<\/html>/gi, '')
-      .replace(/<head[^>]*>.*?<\/head>/gi, '')
-      .replace(/<body[^>]*>/gi, '')
-      .replace(/<\/body>/gi, '');
-
-    // 使用安全的HTML处理函数
-    const safeContent = sanitizeHtmlForOutput(contentWithoutWrapper);
-    finalHtml = createPerfectWordHtml(safeContent, options);
+    finalHtml = addMissingStyles(finalHtml, options);
   }
-
-  // 使用全局的安全HTML处理函数
-
+  
   // 确保DOCTYPE和完整的HTML结构
   if (!finalHtml.includes('<!DOCTYPE')) {
-    const cleanedContent = finalHtml
-      .replace(/<!DOCTYPE[^>]*>/gi, '')
-      .replace(/<html[^>]*>/gi, '')
-      .replace(/<\/html>/gi, '')
-      .replace(/<head[^>]*>.*?<\/head>/gi, '')
-      .replace(/<body[^>]*>/gi, '')
-      .replace(/<\/body>/gi, '');
-    
-    const safeContent = sanitizeHtmlForOutput(cleanedContent);
-    
-    finalHtml = `<!DOCTYPE html>
+    finalHtml = ensureCompleteHtmlStructure(finalHtml, options);
+  }
+  
+  // 处理样式合并和优化
+  finalHtml = await mergeAndOptimizeStyles(finalHtml);
+  
+  return finalHtml;
+}
+
+// 添加缺失样式的辅助函数
+function addMissingStyles(html: string, options: any): string {
+  console.error('⚠️ 检测到样式缺失，强制注入Word样式...');
+  
+  const contentWithoutWrapper = html
+    .replace(/<!DOCTYPE[^>]*>/gi, '')
+    .replace(/<html[^>]*>/gi, '')
+    .replace(/<\/html>/gi, '')
+    .replace(/<head[^>]*>.*?<\/head>/gi, '')
+    .replace(/<body[^>]*>/gi, '')
+    .replace(/<\/body>/gi, '');
+
+  const safeContent = sanitizeHtmlForOutput(contentWithoutWrapper);
+  return createPerfectWordHtml(safeContent, options);
+}
+
+// 确保完整HTML结构的辅助函数
+function ensureCompleteHtmlStructure(html: string, options: any): string {
+  const cleanedContent = html
+    .replace(/<!DOCTYPE[^>]*>/gi, '')
+    .replace(/<html[^>]*>/gi, '')
+    .replace(/<\/html>/gi, '')
+    .replace(/<head[^>]*>.*?<\/head>/gi, '')
+    .replace(/<body[^>]*>/gi, '')
+    .replace(/<\/body>/gi, '');
+  
+  const safeContent = sanitizeHtmlForOutput(cleanedContent);
+  const styleContent = html.includes('<style>') ? '' : 
+    createPerfectWordHtml('', options).match(/<style[^>]*>[\s\S]*?<\/style>/gi)?.[0] || '';
+  
+  return `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Document</title>
-    ${finalHtml.includes('<style>') ? '' : createPerfectWordHtml('', options).match(/<style[^>]*>[\s\S]*?<\/style>/gi)?.[0] || ''}
+    ${styleContent}
 </head>
 <body>
 ${safeContent}
 </body>
 </html>`;
-  }
+}
 
-  // 强制确保所有样式都被内联到HTML中，防止样式丢失
-  // 提取所有样式标签内容
+// 合并和优化样式的辅助函数
+async function mergeAndOptimizeStyles(html: string): Promise<string> {
+  const styleTagsContent = extractStyleContent(html);
+  
+  if (styleTagsContent.length === 0) {
+    styleTagsContent.push(getBasicWordStyles());
+  }
+  
+  let combinedStyles = styleTagsContent.join('\n');
+  combinedStyles = addImportantToStyles(combinedStyles);
+  
+  let finalHtml = html.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  finalHtml = insertCombinedStyles(finalHtml, combinedStyles);
+  finalHtml = enhanceInlineStyles(finalHtml);
+  
+  return await processWithCheerio(finalHtml);
+}
+
+// 提取样式内容的辅助函数
+function extractStyleContent(html: string): string[] {
   const styleTagsContent: string[] = [];
   let styleTagMatch;
   const styleTagRegex = /<style[^>]*>([\s\S]*?)<\/style>/gi;
-  while ((styleTagMatch = styleTagRegex.exec(finalHtml)) !== null) {
+  
+  while ((styleTagMatch = styleTagRegex.exec(html)) !== null) {
     const styleContent = styleTagMatch[1].trim();
     if (styleContent) {
       styleTagsContent.push(styleContent);
     }
   }
+  
+  return styleTagsContent;
+}
 
-  // 如果没有找到有效的样式内容，添加基本的Word样式
-  if (styleTagsContent.length === 0) {
-    console.error('⚠️ 未找到有效样式内容，添加基本Word样式');
-    // 从createPerfectWordHtml提取样式
-    const perfectWordStyles =
-      createPerfectWordHtml('', options).match(/<style[^>]*>([\s\S]*?)<\/style>/i)?.[1] || '';
-    if (perfectWordStyles.trim()) {
-      styleTagsContent.push(perfectWordStyles.trim());
-    } else {
-      // 添加最小的基本样式
-      const basicWordStyles = `
-          body { font-family: "Calibri", "Microsoft YaHei", "SimSun", sans-serif !important; }
-          p { margin-bottom: 8pt !important; line-height: 1.08 !important; }
-          table { border-collapse: collapse !important; }
-          td, th { border: 1px solid #000 !important; padding: 5pt !important; }
-          * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; print-color-adjust: exact !important; }
-        `;
-      styleTagsContent.push(basicWordStyles);
-    }
-  }
+// 获取基本Word样式的辅助函数
+function getBasicWordStyles(): string {
+  console.error('⚠️ 未找到有效样式内容，添加基本Word样式');
+  return `
+    body { font-family: "Calibri", "Microsoft YaHei", "SimSun", sans-serif !important; }
+    p { margin-bottom: 8pt !important; line-height: 1.08 !important; }
+    table { border-collapse: collapse !important; }
+    td, th { border: 1px solid #000 !important; padding: 5pt !important; }
+    * { -webkit-print-color-adjust: exact !important; color-adjust: exact !important; print-color-adjust: exact !important; }
+  `;
+}
 
-  // 合并所有样式
-  let combinedStyles = styleTagsContent.join('\n');
-
-  // 确保所有CSS规则都有!important
-  combinedStyles = combinedStyles.replace(/([^;{}:]+:[^;{}!]+)(?=;|})/g, match => {
-    if (!match.includes('!important')) {
-      return match + ' !important';
-    }
-    return match;
+// 为样式添加!important的辅助函数
+function addImportantToStyles(styles: string): string {
+  return styles.replace(/([^;{}:]+:[^;{}!]+)(?=;|})/g, match => {
+    return match.includes('!important') ? match : match + ' !important';
   });
+}
 
-  // 移除所有现有样式标签
-  finalHtml = finalHtml.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-
-  // 在head中添加合并后的样式
-  if (finalHtml.includes('</head>')) {
-    finalHtml = finalHtml.replace(
-      /<\/head>/i,
-      `<style type="text/css">\n${combinedStyles}\n</style>\n</head>`
-    );
-  } else if (finalHtml.includes('<head')) {
-    // 在已有的head中添加样式
-    finalHtml = finalHtml.replace(
-      /<head[^>]*>/i,
-      `$&\n<style type="text/css">\n${combinedStyles}\n</style>`
-    );
-  } else if (finalHtml.includes('<html')) {
-    // 如果没有head标签，添加head和样式
-    finalHtml = finalHtml.replace(
-      /<html[^>]*>/i,
-      `$&\n<head>\n<style type="text/css">\n${combinedStyles}\n</style>\n</head>`
-    );
+// 插入合并样式的辅助函数
+function insertCombinedStyles(html: string, combinedStyles: string): string {
+  if (html.includes('</head>')) {
+    return html.replace(/<\/head>/i, `<style type="text/css">\n${combinedStyles}\n</style>\n</head>`);
+  } else if (html.includes('<head')) {
+    return html.replace(/<head[^>]*>/i, `$&\n<style type="text/css">\n${combinedStyles}\n</style>`);
+  } else if (html.includes('<html')) {
+    return html.replace(/<html[^>]*>/i, `$&\n<head>\n<style type="text/css">\n${combinedStyles}\n</style>\n</head>`);
   } else {
-    // 如果连html标签都没有，创建完整的HTML结构
-    const bodyContent = finalHtml;
-    finalHtml = `<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="UTF-8">\n<style type="text/css">\n${combinedStyles}\n</style>\n</head>\n<body>\n${bodyContent}\n</body>\n</html>`;
+    return `<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="UTF-8">\n<style type="text/css">\n${combinedStyles}\n</style>\n</head>\n<body>\n${html}\n</body>\n</html>`;
   }
+}
 
-  // 确保内联样式属性也被保留
-  finalHtml = finalHtml.replace(/<([a-z][a-z0-9]*)([^>]*?)>/gi, (match, tag, attrs) => {
-    // 保留原有的style属性，并添加!important
+// 增强内联样式的辅助函数
+function enhanceInlineStyles(html: string): string {
+  return html.replace(/<([a-z][a-z0-9]*)([^>]*?)>/gi, (match, tag, attrs) => {
     if (attrs.includes('style=')) {
       return match.replace(/style=(["'])(.*?)\1/gi, (styleMatch, quote, styleContent) => {
-        // 为每个样式属性添加!important（如果尚未添加）
         const enhancedStyle = styleContent.replace(/([^;]+)(?=;|$)/g, prop => {
-          if (!prop.includes('!important')) {
-            return `${prop} !important`;
-          }
-          return prop;
+          return prop.includes('!important') ? prop : `${prop} !important`;
         });
         return `style=${quote}${enhancedStyle}${quote}`;
       });
     }
     return match;
   });
+}
 
-  // 使用cheerio处理HTML，确保所有样式都被内联到HTML中
-  let $ = cheerio.load(finalHtml, { decodeEntities: false });
-
-  // 提取所有样式标签内容
+// 使用Cheerio处理HTML的辅助函数
+async function processWithCheerio(html: string): Promise<string> {
+  const $ = cheerio.load(html, { decodeEntities: false });
+  
   let allStyles = '';
   $('style').each((i, el) => {
     allStyles += $(el).html() + '\n';
   });
-
-  // 确保所有样式规则都有!important标记
-  allStyles = allStyles.replace(/([^;{}]+)(?=;|})/g, match => {
-    if (!match.includes('!important')) {
-      return match + ' !important';
-    }
-    return match;
-  });
-
-  // 移除所有现有样式标签
+  
+  allStyles = addImportantToStyles(allStyles);
   $('style').remove();
-
-  // 在<head>中添加合并后的样式
+  
   if (!$('head').length) {
     $('html').prepend('<head></head>');
   }
   $('head').append(`<style type="text/css">${allStyles}</style>`);
-
-  // 为内联样式属性添加!important
+  
   $('[style]').each((i, el) => {
     const style = $(el).attr('style');
     if (style) {
@@ -1277,94 +1281,78 @@ ${safeContent}
         .split(';')
         .map(rule => {
           rule = rule.trim();
-          if (rule && !rule.includes('!important')) {
-            return rule + ' !important';
-          }
-          return rule;
+          return rule && !rule.includes('!important') ? rule + ' !important' : rule;
         })
         .join(';');
       $(el).attr('style', importantStyle);
     }
   });
+  
+  return $.html();
+}
 
-  // 更新最终HTML
-  finalHtml = $.html();
-
-  // 创建临时HTML文件并强制写入完整内容
-  if (!tempHtmlPath) {
-    tempHtmlPath = path.join(os.tmpdir(), `docx-conversion-${Date.now()}.html`);
-    await fs.writeFile(tempHtmlPath, finalHtml, 'utf8');
-    console.error(`📝 样式修复后的HTML文件已创建: ${tempHtmlPath}`);
-  } else if (options.useExistingHtml && options.existingHtmlPath) {
-    console.error(`📝 使用已存在的HTML文件: ${tempHtmlPath}`);
-  }
-
-  // 验证最终文件内容
+// 创建和验证HTML文件的辅助函数
+async function createAndValidateHtmlFile(finalHtml: string, options: any): Promise<string> {
+  const tempHtmlPath = path.join(os.tmpdir(), `docx-conversion-${Date.now()}.html`);
+  await fs.writeFile(tempHtmlPath, finalHtml, 'utf8');
+  console.error(`📝 样式修复后的HTML文件已创建: ${tempHtmlPath}`);
+  
   const writtenContent = await fs.readFile(tempHtmlPath, 'utf8');
-  // 使用正则表达式检查样式标签，而不是简单的字符串匹配
-  const styleTagsMatch = writtenContent.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || [];
-  const writtenHasStyle = styleTagsMatch.length > 0;
-  const writtenHasDoctype = writtenContent.includes('<!DOCTYPE');
-  const hasWordStyles =
-    writtenContent.includes('Microsoft YaHei') || writtenContent.includes('Calibri');
+  const validationResult = validateHtmlContent(writtenContent);
+  
+  console.error('🔍 样式修复验证:', {
+    filePath: tempHtmlPath,
+    fileSize: writtenContent.length,
+    ...validationResult,
+    contentPreview: writtenContent.substring(0, 500) + '...',
+  });
+  
+  if (!validationResult.isValid) {
+    await forceInjectWordStyles(tempHtmlPath, writtenContent, options);
+  }
+  
+  return tempHtmlPath;
+}
 
-  // 检查样式标签内是否有实际内容
+// 验证HTML内容的辅助函数
+function validateHtmlContent(content: string) {
+  const styleTagsMatch = content.match(/<style[^>]*>[\s\S]*?<\/style>/gi) || [];
+  const hasStyle = styleTagsMatch.length > 0;
+  const hasDoctype = content.includes('<!DOCTYPE');
+  const hasWordStyles = content.includes('Microsoft YaHei') || content.includes('Calibri');
+  
   const hasStyleContent = styleTagsMatch.some(tag => {
     const styleContent = tag.replace(/<style[^>]*>/i, '').replace(/<\/style>/i, '');
     return styleContent.trim().length > 0;
   });
-
-  // 检查是否有基本的CSS规则
+  
   const hasCssRules = styleTagsMatch.some(tag => {
     const styleContent = tag.replace(/<style[^>]*>/i, '').replace(/<\/style>/i, '');
     return styleContent.includes('{') && styleContent.includes('}');
   });
-
-  console.error('🔍 样式修复验证:', {
-    filePath: tempHtmlPath,
-    fileSize: writtenContent.length,
-    hasStyle: writtenHasStyle,
-    hasStyleContent: hasStyleContent,
-    hasCssRules: hasCssRules,
-    hasDoctype: writtenHasDoctype,
-    hasWordStyles: hasWordStyles,
+  
+  return {
+    hasStyle,
+    hasStyleContent,
+    hasCssRules,
+    hasDoctype,
+    hasWordStyles,
     styleTagCount: styleTagsMatch.length,
-    contentPreview: writtenContent.substring(0, 500) + '...',
-  });
+    isValid: hasStyle && hasStyleContent && hasCssRules && hasWordStyles
+  };
+}
 
-  if (!writtenHasStyle || !hasStyleContent || !hasCssRules || !hasWordStyles) {
-    console.error('❌ 样式修复失败，手动注入完整Word样式...');
-
-    // 强制注入完整的Word样式
-    // 从createPerfectWordHtml获取完整的样式定义
-    const perfectHtml = createPerfectWordHtml('', options);
-    const wordStyles = perfectHtml.match(/<style[^>]*>[\s\S]*?<\/style>/gi)?.[0] || '';
-
-    // 提取文档内容，保留所有HTML结构但移除现有样式
-    let bodyContent = writtenContent;
-
-    // 如果文档已经有HTML结构，只提取body内容
-    if (bodyContent.includes('<body') && bodyContent.includes('</body>')) {
-      const bodyMatch = bodyContent.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-      if (bodyMatch && bodyMatch[1]) {
-        bodyContent = bodyMatch[1];
-      }
-    } else if (bodyContent.includes('<html') || bodyContent.includes('<!DOCTYPE')) {
-      // 如果有HTML标签但没有完整的body标签，移除HTML结构保留内容
-      bodyContent = bodyContent
-        .replace(/<!DOCTYPE[^>]*>/gi, '')
-        .replace(/<html[^>]*>/gi, '')
-        .replace(/<\/html>/gi, '')
-        .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
-        .replace(/<body[^>]*>/gi, '')
-        .replace(/<\/body>/gi, '');
-    }
-
-    // 移除所有现有样式标签
-    bodyContent = bodyContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
-
-    // 创建强制注入样式的完整HTML
-    const enforcedHtml = `<!DOCTYPE html>
+// 强制注入Word样式的辅助函数
+async function forceInjectWordStyles(tempHtmlPath: string, content: string, options: any): Promise<void> {
+  console.error('❌ 样式修复失败，手动注入完整Word样式...');
+  
+  const perfectHtml = createPerfectWordHtml('', options);
+  const wordStyles = perfectHtml.match(/<style[^>]*>[\s\S]*?<\/style>/gi)?.[0] || '';
+  
+  let bodyContent = extractBodyContent(content);
+  bodyContent = bodyContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  
+  const enforcedHtml = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -1376,12 +1364,30 @@ ${safeContent}
 ${bodyContent}
 </body>
 </html>`;
+  
+  await fs.writeFile(tempHtmlPath, enforcedHtml, 'utf8');
+  console.error('✅ 样式强制注入完成');
+}
 
-    await fs.writeFile(tempHtmlPath, enforcedHtml, 'utf8');
-    console.error('✅ 样式强制注入完成');
+// 提取body内容的辅助函数
+function extractBodyContent(content: string): string {
+  if (content.includes('<body') && content.includes('</body>')) {
+    const bodyMatch = content.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
+    return bodyMatch?.[1] || content;
+  } else if (content.includes('<html') || content.includes('<!DOCTYPE')) {
+    return content
+      .replace(/<!DOCTYPE[^>]*>/gi, '')
+      .replace(/<html[^>]*>/gi, '')
+      .replace(/<\/html>/gi, '')
+      .replace(/<head[^>]*>[\s\S]*?<\/head>/gi, '')
+      .replace(/<body[^>]*>/gi, '')
+      .replace(/<\/body>/gi, '');
   }
+  return content;
+}
 
-  // Step 5: Return explicit Playwright-MCP call instructions
+// 创建Playwright指令的辅助函数
+function createPlaywrightInstructions(finalOutputPath: string, tempHtmlPath: string, options: any) {
   return {
     success: true,
     requiresPlaywright: true,
@@ -1399,117 +1405,112 @@ ${bodyContent}
         '6. browser_close - Close browser',
       ],
     },
-    playwrightInstructions: [
-      {
-        action: 'browser_launch',
-        params: {
-          headless: true,
-          args: [
-            '--no-sandbox',
-            '--disable-setuid-sandbox',
-            '--disable-dev-shm-usage',
-            '--disable-gpu',
-            '--font-render-hinting=none',
-            '--disable-font-subpixel-positioning',
-          ],
-        },
-      },
-      {
-        action: 'browser_new_page',
-        params: {},
-      },
-      {
-        action: 'page_goto',
-        params: {
-          url: `file://${tempHtmlPath}`,
-          options: {
-            waitUntil: 'networkidle',
-            timeout: 30000,
-          },
-        },
-      },
-      {
-        action: 'page_add_script_tag',
-        params: {
-          content: `
-              // 确保所有样式都被正确应用
-              function ensureStylesApplied() {
-                // 检查样式是否存在
-                const styles = document.querySelectorAll('style');
-                if (styles.length === 0) {
-                  console.error('警告: 未找到样式标签');
-                  
-                  // 创建基本样式
-                  const style = document.createElement('style');
-                  style.textContent = 'body { font-family: "Calibri", "Microsoft YaHei", sans-serif !important; } * { -webkit-print-color-adjust: exact !important; }';
-                  document.head.appendChild(style);
-                }
-                
-                // 确保所有样式规则都有!important
-                styles.forEach(style => {
-                  if (style.sheet) {
-                    console.log(\`样式表已加载，规则数: \${style.sheet.cssRules.length}\`);
-                  }
-                });
-              }
-              
-              // 执行样式检查
-              ensureStylesApplied();
-            `,
-        },
-      },
-      {
-        action: 'page_wait_for_timeout',
-        params: {
-          timeout: 3000,
-        },
-      },
-      {
-        action: 'page_evaluate',
-        params: {
-          function: () => {
-            // 确保所有样式都被应用
-            document.querySelectorAll('style').forEach(style => {
-              if (style.sheet) {
-                console.log(`样式表已加载，规则数: ${style.sheet.cssRules.length}`);
-              }
-            });
-            // 强制重新计算样式
-            document.body.style.visibility = 'hidden';
-            setTimeout(() => {
-              document.body.style.visibility = 'visible';
-            }, 50);
-            return 'CSS样式已确认加载';
-          },
-        },
-      },
-      {
-        action: 'page_pdf',
-        params: {
-          path: finalOutputPath,
-          options: {
-            format: 'A4',
-            printBackground: true,
-            preferCSSPageSize: true,
-            margin: {
-              top: '0.75in',
-              right: '0.75in',
-              bottom: '0.75in',
-              left: '0.75in',
-            },
-            styleTagsTimeout: 5000,
-          },
-        },
-      },
-      {
-        action: 'browser_close',
-        params: {},
-      },
-    ],
+    playwrightInstructions: createPlaywrightSteps(finalOutputPath, tempHtmlPath),
     outputPath: finalOutputPath,
     tempHtmlPath: tempHtmlPath,
-    cleanupRequired: !options.useExistingHtml, // 如果使用的是已存在的HTML文件，则不需要清理
+    cleanupRequired: !options.useExistingHtml,
   };
+}
+
+// 创建Playwright步骤的辅助函数
+function createPlaywrightSteps(finalOutputPath: string, tempHtmlPath: string) {
+  return [
+    {
+      action: 'browser_launch',
+      params: {
+        headless: true,
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-gpu',
+          '--font-render-hinting=none',
+          '--disable-font-subpixel-positioning',
+        ],
+      },
+    },
+    {
+      action: 'browser_new_page',
+      params: {},
+    },
+    {
+      action: 'page_goto',
+      params: {
+        url: `file://${tempHtmlPath}`,
+        options: {
+          waitUntil: 'networkidle',
+          timeout: 30000,
+        },
+      },
+    },
+    {
+      action: 'page_add_script_tag',
+      params: {
+        content: `
+          function ensureStylesApplied() {
+            const styles = document.querySelectorAll('style');
+            if (styles.length === 0) {
+              console.error('警告: 未找到样式标签');
+              const style = document.createElement('style');
+              style.textContent = 'body { font-family: "Calibri", "Microsoft YaHei", sans-serif !important; } * { -webkit-print-color-adjust: exact !important; }';
+              document.head.appendChild(style);
+            }
+            styles.forEach(style => {
+              if (style.sheet) {
+                console.log(\`样式表已加载，规则数: \${style.sheet.cssRules.length}\`);
+              }
+            });
+          }
+          ensureStylesApplied();
+        `,
+      },
+    },
+    {
+      action: 'page_wait_for_timeout',
+      params: {
+        timeout: 3000,
+      },
+    },
+    {
+      action: 'page_evaluate',
+      params: {
+        function: () => {
+          document.querySelectorAll('style').forEach(style => {
+            if (style.sheet) {
+              console.log(`样式表已加载，规则数: ${style.sheet.cssRules.length}`);
+            }
+          });
+          document.body.style.visibility = 'hidden';
+          setTimeout(() => {
+            document.body.style.visibility = 'visible';
+          }, 50);
+          return 'CSS样式已确认加载';
+        },
+      },
+    },
+    {
+      action: 'page_pdf',
+      params: {
+        path: finalOutputPath,
+        options: {
+          format: 'A4',
+          printBackground: true,
+          preferCSSPageSize: true,
+          margin: {
+            top: '0.75in',
+            right: '0.75in',
+            bottom: '0.75in',
+            left: '0.75in',
+          },
+          styleTagsTimeout: 5000,
+        },
+      },
+    },
+    {
+      action: 'browser_close',
+      params: {},
+    },
+  ];
 }
 
 // 终极版Word样式HTML生成器 - 确保100%样式还原
@@ -2948,257 +2949,15 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
   const { name, arguments: args } = request.params;
 
   try {
-    switch (name) {
-      case 'read_document':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(await readDocument(args.filePath, args), null, 2),
-            },
-          ],
-        };
-
-      case 'write_document':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                await writeDocument(args.content, args.outputPath, args),
-                null,
-                2
-              ),
-            },
-          ],
-        };
-
-      case 'convert_document':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                await convertDocument(args.inputPath, args.outputPath, args),
-                null,
-                2
-              ),
-            },
-          ],
-        };
-
-      // case "add_watermark":  // 移除独立工具处理，避免混淆
-      //   return {
-      //     content: [
-      //       {
-      //         type: "text",
-      //         text: JSON.stringify(await addWatermark(args.pdfPath, args), null, 2)
-      //       }
-      //     ]
-      //   };
-
-      // case "add_qrcode":     // 移除独立工具处理，避免混淆
-      //   return {
-      //     content: [
-      //       {
-      //         type: "text",
-      //         text: JSON.stringify(await addQRCode(args.pdfPath, args.qrCodePath, args), null, 2)
-      //       }
-      //     ]
-      //   };
-
-      case 'process_pdf_post_conversion':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                await processPdfPostConversion(args.playwrightPdfPath, args.targetPath, args),
-                null,
-                2
-              ),
-            },
-          ],
-        };
-
-      case 'convert_docx_to_pdf':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(
-                await convertDocxToPdf(args.docxPath, args.outputPath, args),
-                null,
-                2
-              ),
-            },
-          ],
-        };
-
-      case 'convert_markdown_to_html':
-        const markdownResult = await convertMarkdownToHtml(args.markdownPath, {
-          theme: args.theme || 'github',
-          includeTableOfContents: args.includeTableOfContents || false,
-          customCSS: args.customCSS,
-          outputPath: args.outputPath
-            ? path.isAbsolute(args.outputPath)
-              ? args.outputPath
-              : path.join(defaultResourcePaths.outputDir, args.outputPath)
-            : path.join(
-                defaultResourcePaths.outputDir,
-                `${path.basename(args.markdownPath, path.extname(args.markdownPath))}.html`
-              ),
-          standalone: true,
-          debug: true,
-        });
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(markdownResult, null, 2),
-            },
-          ],
-        };
-
-      case 'convert_markdown_to_docx':
-        const docxResult = await convertMarkdownToDocx(args.markdownPath, {
-          theme: args.theme || 'professional',
-          includeTableOfContents: args.includeTableOfContents || false,
-          preserveStyles: args.preserveStyles !== false,
-          outputPath: args.outputPath
-            ? path.isAbsolute(args.outputPath)
-              ? args.outputPath
-              : path.join(defaultResourcePaths.outputDir, args.outputPath)
-            : path.join(
-                defaultResourcePaths.outputDir,
-                `${path.basename(args.markdownPath, path.extname(args.markdownPath))}.docx`
-              ),
-          debug: true,
-        });
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(docxResult, null, 2),
-            },
-          ],
-        };
-
-      case 'convert_markdown_to_pdf':
-        const pdfResult = await convertMarkdownToPdf(
-          args.markdownPath,
-          args.outputPath
-            ? path.isAbsolute(args.outputPath)
-              ? args.outputPath
-              : path.join(defaultResourcePaths.outputDir, args.outputPath)
-            : path.join(
-                defaultResourcePaths.outputDir,
-                `${path.basename(args.markdownPath, path.extname(args.markdownPath))}.pdf`
-              ),
-          {
-            theme: args.theme || 'github',
-            includeTableOfContents: args.includeTableOfContents || false,
-            addQrCode: args.addQrCode || false,
-          }
-        );
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(pdfResult, null, 2),
-            },
-          ],
-        };
-
-      case 'convert_html_to_markdown':
-        // 使用增强的HTML到Markdown转换器
-        const {
-          EnhancedHtmlToMarkdownConverter,
-        } = require('./tools/enhancedHtmlToMarkdownConverter');
-        const enhancedConverter = new EnhancedHtmlToMarkdownConverter();
-
-        const finalOutputPath = args.outputPath
-          ? path.isAbsolute(args.outputPath)
-            ? args.outputPath
-            : path.join(defaultResourcePaths.outputDir, args.outputPath)
-          : path.join(
-              defaultResourcePaths.outputDir,
-              `${path.basename(args.htmlPath, path.extname(args.htmlPath))}.md`
-            );
-
-        const htmlToMdResult = await enhancedConverter.convertHtmlToMarkdown(args.htmlPath, {
-          preserveStyles: args.preserveStyles !== false,
-          includeCSS: args.includeCSS || false,
-          debug: args.debug || false,
-          outputPath: finalOutputPath,
-        });
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(htmlToMdResult, null, 2),
-            },
-          ],
-        };
-
-      case 'plan_conversion':
-        // 使用转换规划器
-        const planner = new ConversionPlanner();
-        const conversionRequest = {
-          sourceFormat: args.sourceFormat,
-          targetFormat: args.targetFormat,
-          sourceFile: args.sourceFile,
-          requirements: {
-            preserveStyles: args.preserveStyles !== false,
-            includeImages: args.includeImages !== false,
-            theme: args.theme || 'github',
-            quality: args.quality || 'balanced',
-          },
-        };
-
-        const conversionPlan = await planner.planConversion(conversionRequest);
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(conversionPlan, null, 2),
-            },
-          ],
-        };
-
-      case 'dual_parsing_docx_to_html':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(await dualParsingDocxToHtml(args), null, 2),
-            },
-          ],
-        };
-
-      case 'dual_parsing_docx_to_pdf':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(await dualParsingDocxToPdf(args), null, 2),
-            },
-          ],
-        };
-
-      case 'docx_style_analysis':
-        return {
-          content: [
-            {
-              type: 'text',
-              text: JSON.stringify(await analyzeDualParsingStyles(args), null, 2),
-            },
-          ],
-        };
-
-      default:
-        throw new Error(`Unknown tool: ${name}`);
-    }
+    const result = await handleToolCall(name, args);
+    return {
+      content: [
+        {
+          type: 'text',
+          text: JSON.stringify(result, null, 2),
+        },
+      ],
+    };
   } catch (error: any) {
     return {
       content: [
@@ -3211,6 +2970,217 @@ server.setRequestHandler(CallToolRequestSchema, async request => {
     };
   }
 });
+
+// 主要工具调用处理函数
+async function handleToolCall(name: string, args: any) {
+  // 基础文档操作
+  if (isBasicDocumentOperation(name)) {
+    return await handleBasicDocumentOperations(name, args);
+  }
+  
+  // PDF相关操作
+  if (isPdfOperation(name)) {
+    return await handlePdfOperations(name, args);
+  }
+  
+  // Markdown转换操作
+  if (isMarkdownOperation(name)) {
+    return await handleMarkdownOperations(name, args);
+  }
+  
+  // HTML转换操作
+  if (isHtmlOperation(name)) {
+    return await handleHtmlOperations(name, args);
+  }
+  
+  // 双重解析操作
+  if (isDualParsingOperation(name)) {
+    return await handleDualParsingOperations(name, args);
+  }
+  
+  // 转换规划操作
+  if (name === 'plan_conversion') {
+    return await handleConversionPlanning(args);
+  }
+  
+  throw new Error(`Unknown tool: ${name}`);
+}
+
+// 检查是否为基础文档操作
+function isBasicDocumentOperation(name: string): boolean {
+  return ['read_document', 'write_document', 'convert_document'].includes(name);
+}
+
+// 检查是否为PDF操作
+function isPdfOperation(name: string): boolean {
+  return ['process_pdf_post_conversion', 'convert_docx_to_pdf'].includes(name);
+}
+
+// 检查是否为Markdown操作
+function isMarkdownOperation(name: string): boolean {
+  return ['convert_markdown_to_html', 'convert_markdown_to_docx', 'convert_markdown_to_pdf'].includes(name);
+}
+
+// 检查是否为HTML操作
+function isHtmlOperation(name: string): boolean {
+  return ['convert_html_to_markdown'].includes(name);
+}
+
+// 检查是否为双重解析操作
+function isDualParsingOperation(name: string): boolean {
+  return ['dual_parsing_docx_to_html', 'dual_parsing_docx_to_pdf', 'docx_style_analysis'].includes(name);
+}
+
+// 处理基础文档操作
+async function handleBasicDocumentOperations(name: string, args: any) {
+  switch (name) {
+    case 'read_document':
+      return await readDocument(args.filePath, args);
+    case 'write_document':
+      return await writeDocument(args.content, args.outputPath, args);
+    case 'convert_document':
+      return await convertDocument(args.inputPath, args.outputPath, args);
+    default:
+      throw new Error(`Unknown basic document operation: ${name}`);
+  }
+}
+
+// 处理PDF操作
+async function handlePdfOperations(name: string, args: any) {
+  switch (name) {
+    case 'process_pdf_post_conversion':
+      return await processPdfPostConversion(args.playwrightPdfPath, args.targetPath, args);
+    case 'convert_docx_to_pdf':
+      return await convertDocxToPdf(args.docxPath, args.outputPath, args);
+    default:
+      throw new Error(`Unknown PDF operation: ${name}`);
+  }
+}
+
+// 处理Markdown操作
+async function handleMarkdownOperations(name: string, args: any) {
+  switch (name) {
+    case 'convert_markdown_to_html':
+      return await handleMarkdownToHtml(args);
+    case 'convert_markdown_to_docx':
+      return await handleMarkdownToDocx(args);
+    case 'convert_markdown_to_pdf':
+      return await handleMarkdownToPdf(args);
+    default:
+      throw new Error(`Unknown Markdown operation: ${name}`);
+  }
+}
+
+// 处理Markdown到HTML转换
+async function handleMarkdownToHtml(args: any) {
+  const outputPath = resolveOutputPath(args.outputPath, args.markdownPath, '.html');
+  
+  return await convertMarkdownToHtml(args.markdownPath, {
+    theme: args.theme || 'github',
+    includeTableOfContents: args.includeTableOfContents || false,
+    customCSS: args.customCSS,
+    outputPath,
+    standalone: true,
+    debug: true,
+  });
+}
+
+// 处理Markdown到DOCX转换
+async function handleMarkdownToDocx(args: any) {
+  const outputPath = resolveOutputPath(args.outputPath, args.markdownPath, '.docx');
+  
+  return await convertMarkdownToDocx(args.markdownPath, {
+    theme: args.theme || 'professional',
+    includeTableOfContents: args.includeTableOfContents || false,
+    preserveStyles: args.preserveStyles !== false,
+    outputPath,
+    debug: true,
+  });
+}
+
+// 处理Markdown到PDF转换
+async function handleMarkdownToPdf(args: any) {
+  const outputPath = resolveOutputPath(args.outputPath, args.markdownPath, '.pdf');
+  
+  return await convertMarkdownToPdf(args.markdownPath, outputPath, {
+    theme: args.theme || 'github',
+    includeTableOfContents: args.includeTableOfContents || false,
+    addQrCode: args.addQrCode || false,
+  });
+}
+
+// 处理HTML操作
+async function handleHtmlOperations(name: string, args: any) {
+  switch (name) {
+    case 'convert_html_to_markdown':
+      return await handleHtmlToMarkdown(args);
+    default:
+      throw new Error(`Unknown HTML operation: ${name}`);
+  }
+}
+
+// 处理HTML到Markdown转换
+async function handleHtmlToMarkdown(args: any) {
+  const {
+    EnhancedHtmlToMarkdownConverter,
+  } = require('./tools/enhancedHtmlToMarkdownConverter');
+  const enhancedConverter = new EnhancedHtmlToMarkdownConverter();
+  
+  const finalOutputPath = resolveOutputPath(args.outputPath, args.htmlPath, '.md');
+  
+  return await enhancedConverter.convertHtmlToMarkdown(args.htmlPath, {
+    preserveStyles: args.preserveStyles !== false,
+    includeCSS: args.includeCSS || false,
+    debug: args.debug || false,
+    outputPath: finalOutputPath,
+  });
+}
+
+// 处理双重解析操作
+async function handleDualParsingOperations(name: string, args: any) {
+  switch (name) {
+    case 'dual_parsing_docx_to_html':
+      return await dualParsingDocxToHtml(args);
+    case 'dual_parsing_docx_to_pdf':
+      return await dualParsingDocxToPdf(args);
+    case 'docx_style_analysis':
+      return await analyzeDualParsingStyles(args);
+    default:
+      throw new Error(`Unknown dual parsing operation: ${name}`);
+  }
+}
+
+// 处理转换规划
+async function handleConversionPlanning(args: any) {
+  const planner = new ConversionPlanner();
+  const conversionRequest = {
+    sourceFormat: args.sourceFormat,
+    targetFormat: args.targetFormat,
+    sourceFile: args.sourceFile,
+    requirements: {
+      preserveStyles: args.preserveStyles !== false,
+      includeImages: args.includeImages !== false,
+      theme: args.theme || 'github',
+      quality: args.quality || 'balanced',
+    },
+  };
+  
+  return await planner.planConversion(conversionRequest);
+}
+
+// 解析输出路径的辅助函数
+function resolveOutputPath(outputPath: string | undefined, inputPath: string, extension: string): string {
+  if (outputPath) {
+    return path.isAbsolute(outputPath)
+      ? outputPath
+      : path.join(defaultResourcePaths.outputDir, outputPath);
+  }
+  
+  return path.join(
+    defaultResourcePaths.outputDir,
+    `${path.basename(inputPath, path.extname(inputPath))}${extension}`
+  );
+}
 
 // Start server
 async function main() {
