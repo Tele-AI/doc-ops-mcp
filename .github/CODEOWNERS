@@ -1,0 +1,23 @@
+# Global code owners
+cablate
+
+# Core source code
+/src/ @cablate
+
+# Documentation
+/docs/ @cablate
+*.md @cablate
+
+# Configuration files
+package.json @cablate
+tsconfig.json @cablate
+.eslintrc.js @cablate
+.prettierrc @cablate
+jest.config.js @cablate
+
+# CI/CD and workflows
+/.github/ @cablate
+
+# Security configurations
+SECURITY.md @cablate
+.github/workflows/security.yml @cablate

@@ -1,0 +1,72 @@
+version: '3.8'
+
+services:
+  doc-ops-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: doc-ops-mcp
+    restart: unless-stopped
+
+    # Environment variables
+    environment:
+      - NODE_ENV=production
+      - WATERMARK_IMAGE=/app/resources/watermark.png
+      - WATERMARK_TEXT=Confidential
+      - QR_CODE_IMAGE=/app/resources/qrcode.png
+      - PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1
+
+    # Volumes for file operations
+    volumes:
+      - ./documents:/app/documents:rw
+      - ./resources:/app/resources:ro
+      - ./temp:/app/temp:rw
+
+    # Networks
+    networks:
+      - mcp-network
+
+    # Health check
+    healthcheck:
+      test: ['CMD', 'node', 'dist/index.cjs', '--health-check']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Optional: Redis for caching (if needed)
+  redis:
+    image: redis:7-alpine
+    container_name: doc-ops-redis
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Nginx for web interface (if needed)
+  nginx:
+    image: nginx:alpine
+    container_name: doc-ops-nginx
+    restart: unless-stopped
+    ports:
+      - '8080:80'
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./documents:/var/www/documents:ro
+    networks:
+      - mcp-network
+    depends_on:
+      - doc-ops-mcp
+
+networks:
+  mcp-network:
+    driver: bridge
+
+volumes:
+  redis_data:

@@ -1,0 +1,30 @@
+# Auto detect text files and perform LF normalization
+* text=auto
+
+# Force LF line endings for specific file types
+*.js text eol=lf
+*.ts text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.yml text eol=lf
+*.yaml text eol=lf
+
+# Ensure Windows batch files have CRLF line endings
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# Denote binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.docx binary
+*.zip binary
+*.tar.gz binary
+
+# Linguist overrides for better language detection
+*.ts linguist-language=TypeScript
+*.js linguist-language=JavaScript
+*.md linguist-documentation

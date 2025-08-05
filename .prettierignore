@@ -1,0 +1,9 @@
+dist/
+node_modules/
+coverage/
+*.md
+*.json
+.git/
+.github/
+.env*
+*.log
