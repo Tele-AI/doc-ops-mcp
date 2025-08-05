@@ -813,48 +813,88 @@ export class DocumentConverter {
     const contentLines = content.split('\n');
 
     for (const line of contentLines) {
-      const trimmedLine = line.trim();
-      if (!trimmedLine) {
-        lines.push({ text: '', isHeading: false });
-        continue;
-      }
-
-      // 检查是否是标题
-      const isHeading = trimmedLine.startsWith('#') || trimmedLine.startsWith('##');
-      let text = trimmedLine;
-
-      // 移除Markdown标记
-      if (isHeading) {
-        text = text.replace(/^#+\s*/, '');
-      }
-
-      // 简单的文本换行处理
-      const words = text.split(' ');
-      let currentLine = '';
-
-      for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        // 简化的宽度检查（假设每个字符平均宽度）
-        const estimatedWidth = testLine.length * fontSize * 0.6;
-
-        if (estimatedWidth <= maxWidth) {
-          currentLine = testLine;
-        } else {
-          if (currentLine) {
-            lines.push({ text: currentLine, isHeading });
-            currentLine = word;
-          } else {
-            lines.push({ text: word, isHeading });
-          }
-        }
-      }
-
-      if (currentLine) {
-        lines.push({ text: currentLine, isHeading });
-      }
+      const processedLines = this.processContentLine(line, maxWidth, fontSize);
+      lines.push(...processedLines);
     }
 
     return lines;
+  }
+
+  /**
+   * 处理单行内容
+   */
+  private processContentLine(
+    line: string,
+    maxWidth: number,
+    fontSize: number
+  ): Array<{ text: string; isHeading: boolean }> {
+    const trimmedLine = line.trim();
+    
+    if (!trimmedLine) {
+      return [{ text: '', isHeading: false }];
+    }
+
+    const isHeading = this.isMarkdownHeading(trimmedLine);
+    const text = this.removeMarkdownHeadingMarkers(trimmedLine, isHeading);
+    
+    return this.wrapTextToLines(text, maxWidth, fontSize, isHeading);
+  }
+
+  /**
+   * 检查是否是Markdown标题
+   */
+  private isMarkdownHeading(line: string): boolean {
+    return line.startsWith('#') || line.startsWith('##');
+  }
+
+  /**
+   * 移除Markdown标题标记
+   */
+  private removeMarkdownHeadingMarkers(text: string, isHeading: boolean): string {
+    return isHeading ? text.replace(/^#+\s*/, '') : text;
+  }
+
+  /**
+   * 将文本包装成多行
+   */
+  private wrapTextToLines(
+    text: string,
+    maxWidth: number,
+    fontSize: number,
+    isHeading: boolean
+  ): Array<{ text: string; isHeading: boolean }> {
+    const lines: Array<{ text: string; isHeading: boolean }> = [];
+    const words = text.split(' ');
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const estimatedWidth = this.estimateTextWidth(testLine, fontSize);
+
+      if (estimatedWidth <= maxWidth) {
+        currentLine = testLine;
+      } else {
+        if (currentLine) {
+          lines.push({ text: currentLine, isHeading });
+          currentLine = word;
+        } else {
+          lines.push({ text: word, isHeading });
+        }
+      }
+    }
+
+    if (currentLine) {
+      lines.push({ text: currentLine, isHeading });
+    }
+
+    return lines;
+  }
+
+  /**
+   * 估算文本宽度
+   */
+  private estimateTextWidth(text: string, fontSize: number): number {
+    return text.length * fontSize * 0.6;
   }
 
   /**
@@ -870,33 +910,60 @@ export class DocumentConverter {
     const paragraphs = text.split('\n');
 
     for (const paragraph of paragraphs) {
-      if (!paragraph.trim()) {
-        lines.push('');
-        continue;
-      }
+      const paragraphLines = this.processParagraphForPDF(paragraph, maxWidth, font, fontSize);
+      lines.push(...paragraphLines);
+    }
 
-      const words = paragraph.split(' ');
-      let currentLine = '';
+    return lines;
+  }
 
-      for (const word of words) {
-        const testLine = currentLine ? `${currentLine} ${word}` : word;
-        const textWidth = font.widthOfTextAtSize(testLine, fontSize);
+  /**
+   * 处理单个段落用于PDF
+   */
+  private processParagraphForPDF(
+    paragraph: string,
+    maxWidth: number,
+    font: any,
+    fontSize: number
+  ): string[] {
+    if (!paragraph.trim()) {
+      return [''];
+    }
 
-        if (textWidth <= maxWidth) {
-          currentLine = testLine;
+    return this.wrapParagraphToLines(paragraph, maxWidth, font, fontSize);
+  }
+
+  /**
+   * 将段落包装成多行
+   */
+  private wrapParagraphToLines(
+    paragraph: string,
+    maxWidth: number,
+    font: any,
+    fontSize: number
+  ): string[] {
+    const lines: string[] = [];
+    const words = paragraph.split(' ');
+    let currentLine = '';
+
+    for (const word of words) {
+      const testLine = currentLine ? `${currentLine} ${word}` : word;
+      const textWidth = font.widthOfTextAtSize(testLine, fontSize);
+
+      if (textWidth <= maxWidth) {
+        currentLine = testLine;
+      } else {
+        if (currentLine) {
+          lines.push(currentLine);
+          currentLine = word;
         } else {
-          if (currentLine) {
-            lines.push(currentLine);
-            currentLine = word;
-          } else {
-            lines.push(word);
-          }
+          lines.push(word);
         }
       }
+    }
 
-      if (currentLine) {
-        lines.push(currentLine);
-      }
+    if (currentLine) {
+      lines.push(currentLine);
     }
 
     return lines;

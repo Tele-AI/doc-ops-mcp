@@ -408,50 +408,71 @@ export class CSSGenerator {
     const processed: Record<string, string> = {};
 
     for (const [property, value] of Object.entries(css)) {
-      // 跳过无效值
-      if (
-        !value ||
-        value === 'undefined' ||
-        value === 'null' ||
-        value.includes('[object Object]') ||
-        value.includes('NaN')
-      ) {
+      if (this.isInvalidValue(value)) {
         continue;
       }
 
-      let processedValue = value;
-
-      // 处理字体
-      if (property === 'font-family' && typeof value === 'string') {
-        processedValue = this.getFontFamily(value);
-      }
-
-      // 处理颜色
-      if (property.includes('color') && typeof value === 'string') {
-        if (!value.startsWith('#') && !value.startsWith('rgb')) {
-          processedValue = this.normalizeColor(value);
-        } else {
-          processedValue = value;
-        }
-      }
-
-      // 处理尺寸
-      if (this.isSizeProperty(property) && typeof value === 'string') {
-        processedValue = this.normalizeSize(value);
-      }
-
-      // 最终验证：确保值是有效的
-      if (
-        processedValue &&
-        typeof processedValue === 'string' &&
-        !processedValue.includes('NaN') &&
-        !processedValue.includes('[object Object]')
-      ) {
+      const processedValue = this.processStyleValue(property, value);
+      
+      if (this.isValidProcessedValue(processedValue)) {
         processed[property] = processedValue;
       }
     }
 
     return processed;
+  }
+
+  /**
+   * 检查值是否无效
+   */
+  private isInvalidValue(value: any): boolean {
+    return (
+      !value ||
+      value === 'undefined' ||
+      value === 'null' ||
+      (typeof value === 'string' && (value.includes('[object Object]') || value.includes('NaN')))
+    );
+  }
+
+  /**
+   * 处理单个样式值
+   */
+  private processStyleValue(property: string, value: string): string {
+    if (property === 'font-family' && typeof value === 'string') {
+      return this.getFontFamily(value);
+    }
+
+    if (property.includes('color') && typeof value === 'string') {
+      return this.processColorValue(value);
+    }
+
+    if (this.isSizeProperty(property) && typeof value === 'string') {
+      return this.normalizeSize(value);
+    }
+
+    return value;
+  }
+
+  /**
+   * 处理颜色值
+   */
+  private processColorValue(value: string): string {
+    if (!value.startsWith('#') && !value.startsWith('rgb')) {
+      return this.normalizeColor(value);
+    }
+    return value;
+  }
+
+  /**
+   * 检查处理后的值是否有效
+   */
+  private isValidProcessedValue(value: string): boolean {
+    return (
+      Boolean(value) &&
+      typeof value === 'string' &&
+      !value.includes('NaN') &&
+      !value.includes('[object Object]')
+    );
   }
 
   /**

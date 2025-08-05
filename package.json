@@ -2,7 +2,7 @@
   "name": "doc-ops-mcp",
   "author": "Tele-AI",
   "version": "0.0.1",
-  "description": "Document Operations Multi-Channel Platform — A comprehensive platform for document processing, conversion, and automation",
+  "description": "MCP Document Converter Server — A Model Context Protocol server for seamless document format conversion and processing",
   "main": "dist/index.cjs",
   "license": "MIT",
   "scripts": {
@@ -56,7 +56,6 @@
     "playwright": "^1.53.1",
     "puppeteer": "^21.11.0",
     "safer-buffer": "^2.1.2",
-    "doc-ops-mcp": "^1.0.0",
     "turndown": "^7.2.0",
     "unzipper": "^0.12.3",
     "util": "^0.12.5",
@@ -109,8 +108,7 @@
     "document-automation",
     "ai",
     "llm",
-    "playwright",
-    "doc-ops-mcp"
+    "playwright"
   ],
   "homepage": "https://github.com/Tele-AI/doc-ops-mcp#readme",
   "repository": {

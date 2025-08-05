@@ -567,37 +567,26 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
 
     const baseFontSize = docxOptions.fontSize * 2; // DOCX使用半点单位
     const baseFontFamily = docxOptions.fontFamily;
-
-    // 解析元素样式
     const elementStyles = this.parseElementStyles(element);
+    const paragraphConfig = this.createParagraphConfig(elementStyles);
+
+    return this.createParagraphByTag(tagName, text, paragraphConfig, elementStyles, baseFontSize, baseFontFamily, $, element, docxOptions);
+  }
+
+  /**
+   * 创建段落配置
+   */
+  private createParagraphConfig(elementStyles: any): any {
     const paragraphConfig: any = {};
 
     // 设置对齐方式
     if (elementStyles.textAlign) {
-      switch (elementStyles.textAlign) {
-        case 'center':
-          paragraphConfig.alignment = AlignmentType.CENTER;
-          break;
-        case 'right':
-          paragraphConfig.alignment = AlignmentType.RIGHT;
-          break;
-        case 'justify':
-          paragraphConfig.alignment = AlignmentType.JUSTIFIED;
-          break;
-        default:
-          paragraphConfig.alignment = AlignmentType.LEFT;
-      }
+      paragraphConfig.alignment = this.getAlignmentType(elementStyles.textAlign);
     }
 
     // 设置间距
     if (elementStyles.marginTop || elementStyles.marginBottom) {
-      paragraphConfig.spacing = {};
-      if (elementStyles.marginTop) {
-        paragraphConfig.spacing.before = elementStyles.marginTop;
-      }
-      if (elementStyles.marginBottom) {
-        paragraphConfig.spacing.after = elementStyles.marginBottom;
-      }
+      paragraphConfig.spacing = this.createSpacingConfig(elementStyles);
     }
 
     // 设置缩进
@@ -607,118 +596,162 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
       };
     }
 
+    return paragraphConfig;
+  }
+
+  /**
+   * 获取对齐类型
+   */
+  private getAlignmentType(textAlign: string): any {
+    switch (textAlign) {
+      case 'center':
+        return AlignmentType.CENTER;
+      case 'right':
+        return AlignmentType.RIGHT;
+      case 'justify':
+        return AlignmentType.JUSTIFIED;
+      default:
+        return AlignmentType.LEFT;
+    }
+  }
+
+  /**
+   * 创建间距配置
+   */
+  private createSpacingConfig(elementStyles: any): any {
+    const spacing: any = {};
+    if (elementStyles.marginTop) {
+      spacing.before = elementStyles.marginTop;
+    }
+    if (elementStyles.marginBottom) {
+      spacing.after = elementStyles.marginBottom;
+    }
+    return spacing;
+  }
+
+  /**
+   * 根据标签创建段落
+   */
+  private createParagraphByTag(tagName: string, text: string, paragraphConfig: any, elementStyles: any, baseFontSize: number, baseFontFamily: string, $: any, element: any, docxOptions: any): any {
     switch (tagName) {
       case 'h1':
-        paragraphConfig.heading = HeadingLevel.HEADING_1;
-        paragraphConfig.children = [
-          new TextRun({
-            text: text,
-            bold: true,
-            size: elementStyles.fontSize || baseFontSize * 1.5,
-            font: elementStyles.fontFamily || baseFontFamily,
-            color: elementStyles.color || '000000',
-          }),
-        ];
-        return new Paragraph(paragraphConfig);
-
+        return this.createHeadingParagraph(paragraphConfig, text, elementStyles, baseFontSize, baseFontFamily, HeadingLevel.HEADING_1, 1.5);
       case 'h2':
-        paragraphConfig.heading = HeadingLevel.HEADING_2;
-        paragraphConfig.children = [
-          new TextRun({
-            text: text,
-            bold: true,
-            size: elementStyles.fontSize || baseFontSize * 1.3,
-            font: elementStyles.fontFamily || baseFontFamily,
-            color: elementStyles.color || '000000',
-          }),
-        ];
-        return new Paragraph(paragraphConfig);
-
+        return this.createHeadingParagraph(paragraphConfig, text, elementStyles, baseFontSize, baseFontFamily, HeadingLevel.HEADING_2, 1.3);
       case 'h3':
-        paragraphConfig.heading = HeadingLevel.HEADING_3;
-        paragraphConfig.children = [
-          new TextRun({
-            text: text,
-            bold: true,
-            size: elementStyles.fontSize || baseFontSize * 1.1,
-            font: elementStyles.fontFamily || baseFontFamily,
-            color: elementStyles.color || '000000',
-          }),
-        ];
-        return new Paragraph(paragraphConfig);
-
+        return this.createHeadingParagraph(paragraphConfig, text, elementStyles, baseFontSize, baseFontFamily, HeadingLevel.HEADING_3, 1.1);
       case 'h4':
       case 'h5':
       case 'h6':
-        paragraphConfig.children = [
-          new TextRun({
-            text: text,
-            bold: true,
-            size: elementStyles.fontSize || baseFontSize,
-            font: elementStyles.fontFamily || baseFontFamily,
-            color: elementStyles.color || '000000',
-          }),
-        ];
-        return new Paragraph(paragraphConfig);
-
+        return this.createHeadingParagraph(paragraphConfig, text, elementStyles, baseFontSize, baseFontFamily, undefined, 1.0);
       case 'p':
       case 'div':
-        paragraphConfig.children = this.processInlineElementsToDocx($, element, docxOptions);
-        return new Paragraph(paragraphConfig);
-
+        return this.createContentParagraph(paragraphConfig, $, element, docxOptions);
       case 'br':
-        return new Paragraph({
-          children: [
-            new TextRun({
-              text: '',
-              size: baseFontSize,
-              font: baseFontFamily,
-            }),
-          ],
-        });
-
+        return this.createBreakParagraph(baseFontSize, baseFontFamily);
       case 'hr':
-        return new Paragraph({
-          children: [
-            new TextRun({
-              text: '---',
-              size: baseFontSize,
-              font: baseFontFamily,
-            }),
-          ],
-          alignment: AlignmentType.CENTER,
-        });
-
+        return this.createHorizontalRuleParagraph(baseFontSize, baseFontFamily);
       case 'blockquote':
-        paragraphConfig.children = this.processInlineElementsToDocx($, element, docxOptions);
-        paragraphConfig.indent = { left: 720 }; // 0.5英寸缩进
-        paragraphConfig.border = {
-          left: {
-            color: 'CCCCCC',
-            size: 6,
-            style: 'single',
-          },
-        };
-        return new Paragraph(paragraphConfig);
-
+        return this.createBlockquoteParagraph(paragraphConfig, $, element, docxOptions);
       default:
-        if (text) {
-          paragraphConfig.children = [
-            new TextRun({
-              text: text,
-              size: elementStyles.fontSize || baseFontSize,
-              font: elementStyles.fontFamily || baseFontFamily,
-              color: elementStyles.color || '000000',
-              bold: elementStyles.bold || false,
-              italics: elementStyles.italic || false,
-              underline: elementStyles.underline ? {} : undefined,
-              strike: elementStyles.strikethrough || false,
-            }),
-          ];
-          return new Paragraph(paragraphConfig);
-        }
-        return null;
+        return this.createDefaultParagraph(text, paragraphConfig, elementStyles, baseFontSize, baseFontFamily);
     }
+  }
+
+  /**
+   * 创建标题段落
+   */
+  private createHeadingParagraph(paragraphConfig: any, text: string, elementStyles: any, baseFontSize: number, baseFontFamily: string, headingLevel?: any, sizeMultiplier: number = 1.0): any {
+    if (headingLevel) {
+      paragraphConfig.heading = headingLevel;
+    }
+    paragraphConfig.children = [
+      new TextRun({
+        text: text,
+        bold: true,
+        size: elementStyles.fontSize || baseFontSize * sizeMultiplier,
+        font: elementStyles.fontFamily || baseFontFamily,
+        color: elementStyles.color || '000000',
+      }),
+    ];
+    return new Paragraph(paragraphConfig);
+  }
+
+  /**
+   * 创建内容段落
+   */
+  private createContentParagraph(paragraphConfig: any, $: any, element: any, docxOptions: any): any {
+    paragraphConfig.children = this.processInlineElementsToDocx($, element, docxOptions);
+    return new Paragraph(paragraphConfig);
+  }
+
+  /**
+   * 创建换行段落
+   */
+  private createBreakParagraph(baseFontSize: number, baseFontFamily: string): any {
+    return new Paragraph({
+      children: [
+        new TextRun({
+          text: '',
+          size: baseFontSize,
+          font: baseFontFamily,
+        }),
+      ],
+    });
+  }
+
+  /**
+   * 创建水平线段落
+   */
+  private createHorizontalRuleParagraph(baseFontSize: number, baseFontFamily: string): any {
+    return new Paragraph({
+      children: [
+        new TextRun({
+          text: '---',
+          size: baseFontSize,
+          font: baseFontFamily,
+        }),
+      ],
+      alignment: AlignmentType.CENTER,
+    });
+  }
+
+  /**
+   * 创建引用段落
+   */
+  private createBlockquoteParagraph(paragraphConfig: any, $: any, element: any, docxOptions: any): any {
+    paragraphConfig.children = this.processInlineElementsToDocx($, element, docxOptions);
+    paragraphConfig.indent = { left: 720 }; // 0.5英寸缩进
+    paragraphConfig.border = {
+      left: {
+        color: 'CCCCCC',
+        size: 6,
+        style: 'single',
+      },
+    };
+    return new Paragraph(paragraphConfig);
+  }
+
+  /**
+   * 创建默认段落
+   */
+  private createDefaultParagraph(text: string, paragraphConfig: any, elementStyles: any, baseFontSize: number, baseFontFamily: string): any {
+    if (text) {
+      paragraphConfig.children = [
+        new TextRun({
+          text: text,
+          size: elementStyles.fontSize || baseFontSize,
+          font: elementStyles.fontFamily || baseFontFamily,
+          color: elementStyles.color || '000000',
+          bold: elementStyles.bold || false,
+          italics: elementStyles.italic || false,
+          underline: elementStyles.underline ? {} : undefined,
+          strike: elementStyles.strikethrough || false,
+        }),
+      ];
+      return new Paragraph(paragraphConfig);
+    }
+    return null;
   }
 
   /**
@@ -730,86 +763,138 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
     const baseFontFamily = docxOptions.fontFamily;
 
     element.contents().each((i: number, node: any) => {
-      if (node.type === 'text') {
-        const text = $(node).text();
-        if (text.trim()) {
-          textRuns.push(
-            new TextRun({
-              text: text,
-              size: baseFontSize,
-              font: baseFontFamily,
-            })
-          );
-        }
-      } else if (node.type === 'tag') {
-        const $node = $(node);
-        const tagName = $node.prop('tagName')?.toLowerCase();
-        const text = $node.text();
-
-        if (text.trim()) {
-          // 解析CSS样式
-          const styles = this.parseElementStyles($node);
-
-          // 构建TextRun配置
-          const textRunConfig: any = {
-            text: text,
-            size: styles.fontSize || baseFontSize,
-            font: styles.fontFamily || baseFontFamily,
-          };
-
-          // 应用样式
-          if (styles.bold || ['strong', 'b'].includes(tagName)) {
-            textRunConfig.bold = true;
-          }
-
-          if (styles.italic || ['em', 'i'].includes(tagName)) {
-            textRunConfig.italics = true;
-          }
-
-          if (styles.underline || tagName === 'u') {
-            textRunConfig.underline = {};
-          }
-
-          if (styles.strikethrough || ['del', 'strike', 's'].includes(tagName)) {
-            textRunConfig.strike = true;
-          }
-
-          if (styles.color) {
-            textRunConfig.color = styles.color;
-          }
-
-          if (styles.highlight) {
-            textRunConfig.highlight = styles.highlight;
-          }
-
-          textRuns.push(new TextRun(textRunConfig));
-        }
+      const nodeTextRun = this.processNodeToTextRun($, node, baseFontSize, baseFontFamily);
+      if (nodeTextRun) {
+        textRuns.push(nodeTextRun);
       }
     });
 
     // 如果没有找到内联元素，使用整个元素的文本并应用样式
     if (textRuns.length === 0) {
-      const text = element.text().trim();
-      if (text) {
-        const styles = this.parseElementStyles(element);
-        const textRunConfig: any = {
-          text: text,
-          size: styles.fontSize || baseFontSize,
-          font: styles.fontFamily || baseFontFamily,
-        };
-
-        if (styles.bold) textRunConfig.bold = true;
-        if (styles.italic) textRunConfig.italics = true;
-        if (styles.underline) textRunConfig.underline = {};
-        if (styles.strikethrough) textRunConfig.strike = true;
-        if (styles.color) textRunConfig.color = styles.color;
-        if (styles.highlight) textRunConfig.highlight = styles.highlight;
-
-        textRuns.push(new TextRun(textRunConfig));
+      const fallbackTextRun = this.createFallbackTextRun(element, baseFontSize, baseFontFamily);
+      if (fallbackTextRun) {
+        textRuns.push(fallbackTextRun);
       }
     }
 
     return textRuns;
+  }
+
+  /**
+   * 处理单个节点转换为TextRun
+   */
+  private processNodeToTextRun($: any, node: any, baseFontSize: number, baseFontFamily: string): any {
+    if (node.type === 'text') {
+      return this.processTextNodeToTextRun($, node, baseFontSize, baseFontFamily);
+    } else if (node.type === 'tag') {
+      return this.processTagNodeToTextRun($, node, baseFontSize, baseFontFamily);
+    }
+    return null;
+  }
+
+  /**
+   * 处理文本节点转换为TextRun
+   */
+  private processTextNodeToTextRun($: any, node: any, baseFontSize: number, baseFontFamily: string): any {
+    const text = $(node).text();
+    if (text.trim()) {
+      return new TextRun({
+        text: text,
+        size: baseFontSize,
+        font: baseFontFamily,
+      });
+    }
+    return null;
+  }
+
+  /**
+   * 处理标签节点转换为TextRun
+   */
+  private processTagNodeToTextRun($: any, node: any, baseFontSize: number, baseFontFamily: string): any {
+    const $node = $(node);
+    const tagName = $node.prop('tagName')?.toLowerCase();
+    const text = $node.text();
+
+    if (text.trim()) {
+      const styles = this.parseElementStyles($node);
+      const textRunConfig = this.createTextRunConfig(text, styles, tagName, baseFontSize, baseFontFamily);
+      return new TextRun(textRunConfig);
+    }
+    return null;
+  }
+
+  /**
+   * 创建TextRun配置
+   */
+  private createTextRunConfig(text: string, styles: any, tagName: string, baseFontSize: number, baseFontFamily: string): any {
+    const textRunConfig: any = {
+      text: text,
+      size: styles.fontSize || baseFontSize,
+      font: styles.fontFamily || baseFontFamily,
+    };
+
+    this.applyTextRunStyles(textRunConfig, styles, tagName);
+    return textRunConfig;
+  }
+
+  /**
+   * 应用TextRun样式
+   */
+  private applyTextRunStyles(textRunConfig: any, styles: any, tagName: string): void {
+    if (styles.bold || ['strong', 'b'].includes(tagName)) {
+      textRunConfig.bold = true;
+    }
+
+    if (styles.italic || ['em', 'i'].includes(tagName)) {
+      textRunConfig.italics = true;
+    }
+
+    if (styles.underline || tagName === 'u') {
+      textRunConfig.underline = {};
+    }
+
+    if (styles.strikethrough || ['del', 'strike', 's'].includes(tagName)) {
+      textRunConfig.strike = true;
+    }
+
+    if (styles.color) {
+      textRunConfig.color = styles.color;
+    }
+
+    if (styles.highlight) {
+      textRunConfig.highlight = styles.highlight;
+    }
+  }
+
+  /**
+   * 创建备用TextRun
+   */
+  private createFallbackTextRun(element: any, baseFontSize: number, baseFontFamily: string): any {
+    const text = element.text().trim();
+    if (text) {
+      const styles = this.parseElementStyles(element);
+      const textRunConfig: any = {
+        text: text,
+        size: styles.fontSize || baseFontSize,
+        font: styles.fontFamily || baseFontFamily,
+      };
+
+      this.applyFallbackStyles(textRunConfig, styles);
+      return new TextRun(textRunConfig);
+    }
+    return null;
+  }
+
+  /**
+   * 应用备用样式
+   */
+  private applyFallbackStyles(textRunConfig: any, styles: any): void {
+    if (styles.bold) textRunConfig.bold = true;
+    if (styles.italic) textRunConfig.italics = true;
+    if (styles.underline) textRunConfig.underline = {};
+    if (styles.strikethrough) textRunConfig.strike = true;
+    if (styles.color) textRunConfig.color = styles.color;
+    if (styles.highlight) textRunConfig.highlight = styles.highlight;
   }
 
   /**
@@ -818,121 +903,240 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
   private parseElementStyles(element: any): any {
     const styles: any = {};
 
-    // 获取style属性
-    const styleAttr = element.attr('style');
-    if (styleAttr) {
-      const styleRules = styleAttr.split(';');
+    // 解析style属性
+    this.parseStyleAttribute(element, styles);
 
-      for (const rule of styleRules) {
-        const [property, value] = rule.split(':').map((s: string) => s.trim());
-        if (!property || !value) continue;
-
-        switch (property.toLowerCase()) {
-          case 'font-weight':
-            if (value === 'bold' || parseInt(value) >= 600) {
-              styles.bold = true;
-            }
-            break;
-          case 'font-style':
-            if (value === 'italic') {
-              styles.italic = true;
-            }
-            break;
-          case 'text-decoration':
-            if (value.includes('underline')) {
-              styles.underline = true;
-            }
-            if (value.includes('line-through')) {
-              styles.strikethrough = true;
-            }
-            break;
-          case 'font-size':
-            const fontSize = this.parseFontSize(value);
-            if (fontSize) {
-              styles.fontSize = fontSize * 2; // DOCX使用半点单位
-            }
-            break;
-          case 'font-family':
-            styles.fontFamily = value.replace(/["']/g, '').split(',')[0].trim();
-            break;
-          case 'color':
-            const color = this.parseColor(value);
-            if (color) {
-              styles.color = color;
-            }
-            break;
-          case 'background-color':
-            const bgColor = this.parseColor(value);
-            if (bgColor) {
-              styles.highlight = bgColor;
-            }
-            break;
-          case 'text-align':
-            styles.textAlign = value.toLowerCase();
-            break;
-          case 'margin-top':
-            const marginTop = this.parseSpacing(value);
-            if (marginTop) {
-              styles.marginTop = marginTop;
-            }
-            break;
-          case 'margin-bottom':
-            const marginBottom = this.parseSpacing(value);
-            if (marginBottom) {
-              styles.marginBottom = marginBottom;
-            }
-            break;
-          case 'margin-left':
-            const marginLeft = this.parseSpacing(value);
-            if (marginLeft) {
-              styles.marginLeft = marginLeft;
-            }
-            break;
-          case 'padding-left':
-            const paddingLeft = this.parseSpacing(value);
-            if (paddingLeft) {
-              styles.paddingLeft = paddingLeft;
-            }
-            break;
-          case 'line-height':
-            const lineHeight = parseFloat(value);
-            if (!isNaN(lineHeight)) {
-              styles.lineHeight = lineHeight;
-            }
-            break;
-        }
-      }
-    }
-
-    // 检查class属性中的常见样式类
-    const classAttr = element.attr('class');
-    if (classAttr) {
-      const classes = classAttr.split(' ');
-      for (const cls of classes) {
-        switch (cls.toLowerCase()) {
-          case 'bold':
-          case 'font-weight-bold':
-          case 'fw-bold':
-            styles.bold = true;
-            break;
-          case 'italic':
-          case 'font-style-italic':
-          case 'fst-italic':
-            styles.italic = true;
-            break;
-          case 'underline':
-          case 'text-decoration-underline':
-            styles.underline = true;
-            break;
-          case 'strikethrough':
-          case 'text-decoration-line-through':
-            styles.strikethrough = true;
-            break;
-        }
-      }
-    }
+    // 解析class属性
+    this.parseClassAttribute(element, styles);
 
     return styles;
+  }
+
+  /**
+   * 解析style属性
+   */
+  private parseStyleAttribute(element: any, styles: any): void {
+    const styleAttr = element.attr('style');
+    if (!styleAttr) return;
+
+    const styleRules = styleAttr.split(';');
+    for (const rule of styleRules) {
+      this.parseStyleRule(rule, styles);
+    }
+  }
+
+  /**
+   * 解析单个样式规则
+   */
+  private parseStyleRule(rule: string, styles: any): void {
+    const [property, value] = rule.split(':').map((s: string) => s.trim());
+    if (!property || !value) return;
+
+    const propertyLower = property.toLowerCase();
+    this.applyStyleProperty(propertyLower, value, styles);
+  }
+
+  /**
+   * 应用样式属性
+   */
+  private applyStyleProperty(property: string, value: string, styles: any): void {
+    switch (property) {
+      case 'font-weight':
+        this.parseFontWeight(value, styles);
+        break;
+      case 'font-style':
+        this.parseFontStyle(value, styles);
+        break;
+      case 'text-decoration':
+        this.parseTextDecoration(value, styles);
+        break;
+      case 'font-size':
+        this.parseAndSetFontSize(value, styles);
+        break;
+      case 'font-family':
+        this.parseAndSetFontFamily(value, styles);
+        break;
+      case 'color':
+        this.parseAndSetColor(value, styles);
+        break;
+      case 'background-color':
+        this.parseAndSetBackgroundColor(value, styles);
+        break;
+      case 'text-align':
+        styles.textAlign = value.toLowerCase();
+        break;
+      case 'margin-top':
+        this.parseAndSetMarginTop(value, styles);
+        break;
+      case 'margin-bottom':
+        this.parseAndSetMarginBottom(value, styles);
+        break;
+      case 'margin-left':
+        this.parseAndSetMarginLeft(value, styles);
+        break;
+      case 'padding-left':
+        this.parseAndSetPaddingLeft(value, styles);
+        break;
+      case 'line-height':
+        this.parseAndSetLineHeight(value, styles);
+        break;
+    }
+  }
+
+  /**
+   * 解析字体粗细
+   */
+  private parseFontWeight(value: string, styles: any): void {
+    if (value === 'bold' || parseInt(value) >= 600) {
+      styles.bold = true;
+    }
+  }
+
+  /**
+   * 解析字体样式
+   */
+  private parseFontStyle(value: string, styles: any): void {
+    if (value === 'italic') {
+      styles.italic = true;
+    }
+  }
+
+  /**
+   * 解析文本装饰
+   */
+  private parseTextDecoration(value: string, styles: any): void {
+    if (value.includes('underline')) {
+      styles.underline = true;
+    }
+    if (value.includes('line-through')) {
+      styles.strikethrough = true;
+    }
+  }
+
+  /**
+   * 解析并设置字体大小
+   */
+  private parseAndSetFontSize(value: string, styles: any): void {
+    const fontSize = this.parseFontSize(value);
+    if (fontSize) {
+      styles.fontSize = fontSize * 2; // DOCX使用半点单位
+    }
+  }
+
+  /**
+   * 解析并设置字体族
+   */
+  private parseAndSetFontFamily(value: string, styles: any): void {
+    styles.fontFamily = value.replace(/["']/g, '').split(',')[0].trim();
+  }
+
+  /**
+   * 解析并设置颜色
+   */
+  private parseAndSetColor(value: string, styles: any): void {
+    const color = this.parseColor(value);
+    if (color) {
+      styles.color = color;
+    }
+  }
+
+  /**
+   * 解析并设置背景颜色
+   */
+  private parseAndSetBackgroundColor(value: string, styles: any): void {
+    const bgColor = this.parseColor(value);
+    if (bgColor) {
+      styles.highlight = bgColor;
+    }
+  }
+
+  /**
+   * 解析并设置上边距
+   */
+  private parseAndSetMarginTop(value: string, styles: any): void {
+    const marginTop = this.parseSpacing(value);
+    if (marginTop) {
+      styles.marginTop = marginTop;
+    }
+  }
+
+  /**
+   * 解析并设置下边距
+   */
+  private parseAndSetMarginBottom(value: string, styles: any): void {
+    const marginBottom = this.parseSpacing(value);
+    if (marginBottom) {
+      styles.marginBottom = marginBottom;
+    }
+  }
+
+  /**
+   * 解析并设置左边距
+   */
+  private parseAndSetMarginLeft(value: string, styles: any): void {
+    const marginLeft = this.parseSpacing(value);
+    if (marginLeft) {
+      styles.marginLeft = marginLeft;
+    }
+  }
+
+  /**
+   * 解析并设置左内边距
+   */
+  private parseAndSetPaddingLeft(value: string, styles: any): void {
+    const paddingLeft = this.parseSpacing(value);
+    if (paddingLeft) {
+      styles.paddingLeft = paddingLeft;
+    }
+  }
+
+  /**
+   * 解析并设置行高
+   */
+  private parseAndSetLineHeight(value: string, styles: any): void {
+    const lineHeight = parseFloat(value);
+    if (!isNaN(lineHeight)) {
+      styles.lineHeight = lineHeight;
+    }
+  }
+
+  /**
+   * 解析class属性
+   */
+  private parseClassAttribute(element: any, styles: any): void {
+    const classAttr = element.attr('class');
+    if (!classAttr) return;
+
+    const classes = classAttr.split(' ');
+    for (const cls of classes) {
+      this.applyClassStyle(cls.toLowerCase(), styles);
+    }
+  }
+
+  /**
+   * 应用class样式
+   */
+  private applyClassStyle(className: string, styles: any): void {
+    switch (className) {
+      case 'bold':
+      case 'font-weight-bold':
+      case 'fw-bold':
+        styles.bold = true;
+        break;
+      case 'italic':
+      case 'font-style-italic':
+      case 'fst-italic':
+        styles.italic = true;
+        break;
+      case 'underline':
+      case 'text-decoration-underline':
+        styles.underline = true;
+        break;
+      case 'strikethrough':
+      case 'text-decoration-line-through':
+        styles.strikethrough = true;
+        break;
+    }
   }
 
   /**

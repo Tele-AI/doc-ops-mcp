@@ -152,75 +152,147 @@ export class StyleExtractor {
    * 解析段落属性
    */
   private parseParagraphProperties(pPr: any, css: Record<string, string>): void {
-    // 对齐方式
+    this.parseAlignment(pPr, css);
+    this.parseSpacing(pPr, css);
+    this.parseIndentation(pPr, css);
+    this.parseParagraphBorders(pPr, css);
+    this.parseParagraphShading(pPr, css);
+  }
+
+  /**
+   * 解析对齐方式
+   */
+  private parseAlignment(pPr: any, css: Record<string, string>): void {
     if (pPr['w:jc']) {
       const alignmentValue = pPr['w:jc'].val || pPr['w:jc'];
       if (alignmentValue && typeof alignmentValue === 'string') {
         css['text-align'] = this.convertAlignment(alignmentValue);
       }
     }
+  }
 
-    // 间距
-    if (pPr['w:spacing']) {
-      const spacing = pPr['w:spacing'];
-      if (spacing.before && !isNaN(parseInt(spacing.before))) {
-        const beforePt = this.convertTwipsToPoints(spacing.before);
-        if (beforePt >= 0 && beforePt <= 144) {
-          // 合理的间距范围
-          css['margin-top'] = beforePt + 'pt';
-        }
-      }
-      if (spacing.after && !isNaN(parseInt(spacing.after))) {
-        const afterPt = this.convertTwipsToPoints(spacing.after);
-        if (afterPt >= 0 && afterPt <= 144) {
-          css['margin-bottom'] = afterPt + 'pt';
-        }
-      }
-      if (spacing.line && !isNaN(parseInt(spacing.line))) {
-        const lineHeight = this.convertLineSpacing(spacing.line, spacing.lineRule);
-        if (lineHeight && lineHeight !== '0') {
-          css['line-height'] = lineHeight;
-        }
+  /**
+   * 解析间距
+   */
+  private parseSpacing(pPr: any, css: Record<string, string>): void {
+    if (!pPr['w:spacing']) return;
+
+    const spacing = pPr['w:spacing'];
+    this.parseSpacingBefore(spacing, css);
+    this.parseSpacingAfter(spacing, css);
+    this.parseLineSpacing(spacing, css);
+  }
+
+  /**
+   * 解析前间距
+   */
+  private parseSpacingBefore(spacing: any, css: Record<string, string>): void {
+    if (spacing.before && !isNaN(parseInt(spacing.before))) {
+      const beforePt = this.convertTwipsToPoints(spacing.before);
+      if (beforePt >= 0 && beforePt <= 144) {
+        css['margin-top'] = beforePt + 'pt';
       }
     }
+  }
 
-    // 缩进
-    if (pPr['w:ind']) {
-      const indent = pPr['w:ind'];
-      if (indent.left && !isNaN(parseInt(indent.left))) {
-        const leftPt = this.convertTwipsToPoints(indent.left);
-        if (leftPt >= 0 && leftPt <= 720) {
-          // 合理的缩进范围（0-10英寸）
-          css['margin-left'] = leftPt + 'pt';
-        }
-      }
-      if (indent.right && !isNaN(parseInt(indent.right))) {
-        const rightPt = this.convertTwipsToPoints(indent.right);
-        if (rightPt >= 0 && rightPt <= 720) {
-          css['margin-right'] = rightPt + 'pt';
-        }
-      }
-      if (indent.firstLine && !isNaN(parseInt(indent.firstLine))) {
-        const firstLinePt = this.convertTwipsToPoints(indent.firstLine);
-        if (firstLinePt >= -360 && firstLinePt <= 360) {
-          // 合理的首行缩进范围
-          css['text-indent'] = firstLinePt + 'pt';
-        }
-      }
-      if (indent.hanging && !isNaN(parseInt(indent.hanging))) {
-        const hangingPt = this.convertTwipsToPoints(indent.hanging);
-        if (hangingPt >= 0 && hangingPt <= 360) {
-          css['text-indent'] = '-' + hangingPt + 'pt';
-        }
+  /**
+   * 解析后间距
+   */
+  private parseSpacingAfter(spacing: any, css: Record<string, string>): void {
+    if (spacing.after && !isNaN(parseInt(spacing.after))) {
+      const afterPt = this.convertTwipsToPoints(spacing.after);
+      if (afterPt >= 0 && afterPt <= 144) {
+        css['margin-bottom'] = afterPt + 'pt';
       }
     }
+  }
 
-    // 边框
+  /**
+   * 解析行间距
+   */
+  private parseLineSpacing(spacing: any, css: Record<string, string>): void {
+    if (spacing.line && !isNaN(parseInt(spacing.line))) {
+      const lineHeight = this.convertLineSpacing(spacing.line, spacing.lineRule);
+      if (lineHeight && lineHeight !== '0') {
+        css['line-height'] = lineHeight;
+      }
+    }
+  }
+
+  /**
+   * 解析缩进
+   */
+  private parseIndentation(pPr: any, css: Record<string, string>): void {
+    if (!pPr['w:ind']) return;
+
+    const indent = pPr['w:ind'];
+    this.parseLeftIndent(indent, css);
+    this.parseRightIndent(indent, css);
+    this.parseFirstLineIndent(indent, css);
+    this.parseHangingIndent(indent, css);
+  }
+
+  /**
+   * 解析左缩进
+   */
+  private parseLeftIndent(indent: any, css: Record<string, string>): void {
+    if (indent.left && !isNaN(parseInt(indent.left))) {
+      const leftPt = this.convertTwipsToPoints(indent.left);
+      if (leftPt >= 0 && leftPt <= 720) {
+        css['margin-left'] = leftPt + 'pt';
+      }
+    }
+  }
+
+  /**
+   * 解析右缩进
+   */
+  private parseRightIndent(indent: any, css: Record<string, string>): void {
+    if (indent.right && !isNaN(parseInt(indent.right))) {
+      const rightPt = this.convertTwipsToPoints(indent.right);
+      if (rightPt >= 0 && rightPt <= 720) {
+        css['margin-right'] = rightPt + 'pt';
+      }
+    }
+  }
+
+  /**
+   * 解析首行缩进
+   */
+  private parseFirstLineIndent(indent: any, css: Record<string, string>): void {
+    if (indent.firstLine && !isNaN(parseInt(indent.firstLine))) {
+      const firstLinePt = this.convertTwipsToPoints(indent.firstLine);
+      if (firstLinePt >= -360 && firstLinePt <= 360) {
+        css['text-indent'] = firstLinePt + 'pt';
+      }
+    }
+  }
+
+  /**
+   * 解析悬挂缩进
+   */
+  private parseHangingIndent(indent: any, css: Record<string, string>): void {
+    if (indent.hanging && !isNaN(parseInt(indent.hanging))) {
+      const hangingPt = this.convertTwipsToPoints(indent.hanging);
+      if (hangingPt >= 0 && hangingPt <= 360) {
+        css['text-indent'] = '-' + hangingPt + 'pt';
+      }
+    }
+  }
+
+  /**
+   * 解析段落边框
+   */
+  private parseParagraphBorders(pPr: any, css: Record<string, string>): void {
     if (pPr['w:pBdr']) {
       this.parseBorders(pPr['w:pBdr'], css, 'paragraph');
     }
+  }
 
-    // 背景色
+  /**
+   * 解析段落背景色
+   */
+  private parseParagraphShading(pPr: any, css: Record<string, string>): void {
     if (pPr['w:shd']) {
       const shading = pPr['w:shd'];
       if (shading.fill && shading.fill !== 'auto') {
@@ -233,7 +305,20 @@ export class StyleExtractor {
    * 解析文字属性
    */
   private parseRunProperties(rPr: any, css: Record<string, string>): void {
-    // 字体
+    this.parseRunFont(rPr, css);
+    this.parseRunSize(rPr, css);
+    this.parseRunColor(rPr, css);
+    this.parseRunBackground(rPr, css);
+    this.parseRunShading(rPr, css);
+    this.parseRunDecorations(rPr, css);
+    this.parseRunAlignment(rPr, css);
+    this.parseRunSpacing(rPr, css);
+  }
+
+  /**
+   * 解析字体
+   */
+  private parseRunFont(rPr: any, css: Record<string, string>): void {
     if (rPr['w:rFonts']) {
       const fonts = rPr['w:rFonts'];
       const fontFamily = fonts.ascii || fonts.eastAsia || fonts.hAnsi || fonts.cs;
@@ -241,114 +326,145 @@ export class StyleExtractor {
         css['font-family'] = `"${fontFamily}", sans-serif`;
       }
     }
+  }
 
-    // 字号
-    if (rPr['w:sz']) {
-      const sizeValue = rPr['w:sz'].val || rPr['w:sz'];
-      if (sizeValue && !isNaN(parseInt(sizeValue))) {
-        const size = parseInt(sizeValue) / 2; // Word 中是半点
-        if (size > 0 && size <= 72) {
-          // 合理的字体大小范围
-          css['font-size'] = size + 'pt';
+  /**
+   * 解析字号
+   */
+  private parseRunSize(rPr: any, css: Record<string, string>): void {
+    const sizeElements = ['w:sz', 'w:szCs'];
+    for (const element of sizeElements) {
+      if (rPr[element]) {
+        const sizeValue = rPr[element].val || rPr[element];
+        if (sizeValue && !isNaN(parseInt(sizeValue))) {
+          const size = parseInt(sizeValue) / 2;
+          if (size > 0 && size <= 72) {
+            css['font-size'] = size + 'pt';
+            break;
+          }
         }
       }
     }
+  }
 
-    // 字号（东亚字体）
-    if (rPr['w:szCs']) {
-      const sizeValue = rPr['w:szCs'].val || rPr['w:szCs'];
-      if (sizeValue && !isNaN(parseInt(sizeValue))) {
-        const size = parseInt(sizeValue) / 2;
-        if (size > 0 && size <= 72) {
-          css['font-size'] = size + 'pt';
-        }
+  /**
+   * 解析颜色
+   */
+  private parseRunColor(rPr: any, css: Record<string, string>): void {
+    if (!rPr['w:color']) return;
+
+    const colorElement = rPr['w:color'];
+    const colorValue = colorElement.val || colorElement['w:val'] || colorElement;
+    const themeColor = colorElement.themeColor || colorElement['w:themeColor'];
+
+    if (themeColor && typeof themeColor === 'string') {
+      css['color'] = this.convertThemeColor(themeColor);
+    } else if (colorValue && typeof colorValue === 'string' && colorValue !== 'auto') {
+      const cleanColor = colorValue.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+      if (cleanColor.length === 6) {
+        css['color'] = '#' + cleanColor;
       }
     }
+  }
 
-    // 颜色
-    if (rPr['w:color']) {
-      const colorElement = rPr['w:color'];
-      const colorValue = colorElement.val || colorElement['w:val'] || colorElement;
-      const themeColor = colorElement.themeColor || colorElement['w:themeColor'];
-
-      if (themeColor && typeof themeColor === 'string') {
-        // 处理主题颜色
-        css['color'] = this.convertThemeColor(themeColor);
-      } else if (colorValue && typeof colorValue === 'string' && colorValue !== 'auto') {
-        // 确保颜色值是有效的十六进制
-        const cleanColor = colorValue.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
-        if (cleanColor.length === 6) {
-          css['color'] = '#' + cleanColor;
-        }
-      }
-    }
-
-    // 背景色/高亮
+  /**
+   * 解析背景色/高亮
+   */
+  private parseRunBackground(rPr: any, css: Record<string, string>): void {
     if (rPr['w:highlight']) {
       const highlightValue = rPr['w:highlight'].val || rPr['w:highlight'];
       if (highlightValue && typeof highlightValue === 'string') {
         css['background-color'] = this.convertHighlightColor(highlightValue);
       }
     }
+  }
 
-    // 阴影/背景色（更全面的处理）
-    if (rPr['w:shd']) {
-      const shading = rPr['w:shd'];
+  /**
+   * 解析阴影/背景色
+   */
+  private parseRunShading(rPr: any, css: Record<string, string>): void {
+    if (!rPr['w:shd']) return;
 
-      // 处理填充颜色
-      const fillColor = shading.fill || shading['w:fill'];
-      if (
-        fillColor &&
-        typeof fillColor === 'string' &&
-        fillColor !== 'auto' &&
-        fillColor !== '000000'
-      ) {
-        const cleanFill = fillColor.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
-        if (cleanFill.length === 6) {
-          css['background-color'] = '#' + cleanFill;
-        }
-      }
+    const shading = rPr['w:shd'];
+    this.parseShadingFill(shading, css);
+    this.parseShadingForeground(shading, css);
+  }
 
-      // 处理前景色（如果没有其他颜色定义）
-      if (!css['color']) {
-        const fgColor = shading.color || shading['w:color'];
-        if (fgColor && typeof fgColor === 'string' && fgColor !== 'auto') {
-          const cleanColor = fgColor.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
-          if (cleanColor.length === 6) {
-            css['color'] = '#' + cleanColor;
-          }
-        }
+  /**
+   * 解析阴影填充颜色
+   */
+  private parseShadingFill(shading: any, css: Record<string, string>): void {
+    const fillColor = shading.fill || shading['w:fill'];
+    if (
+      fillColor &&
+      typeof fillColor === 'string' &&
+      fillColor !== 'auto' &&
+      fillColor !== '000000'
+    ) {
+      const cleanFill = fillColor.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+      if (cleanFill.length === 6) {
+        css['background-color'] = '#' + cleanFill;
       }
     }
+  }
 
-    // 文字修饰
+  /**
+   * 解析阴影前景色
+   */
+  private parseShadingForeground(shading: any, css: Record<string, string>): void {
+    if (css['color']) return;
+
+    const fgColor = shading.color || shading['w:color'];
+    if (fgColor && typeof fgColor === 'string' && fgColor !== 'auto') {
+      const cleanColor = fgColor.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
+      if (cleanColor.length === 6) {
+        css['color'] = '#' + cleanColor;
+      }
+    }
+  }
+
+  /**
+   * 解析文字修饰
+   */
+  private parseRunDecorations(rPr: any, css: Record<string, string>): void {
     if (rPr['w:b']) css['font-weight'] = 'bold';
     if (rPr['w:i']) css['font-style'] = 'italic';
+    
     if (rPr['w:u']) {
       const underline = rPr['w:u'].val || rPr['w:u'];
       css['text-decoration'] = underline === 'none' ? 'none' : 'underline';
     }
-    if (rPr['w:strike']) css['text-decoration'] = 'line-through';
-    if (rPr['w:dstrike']) css['text-decoration'] = 'line-through';
-
-    // 上下标
-    if (rPr['w:vertAlign']) {
-      const vertAlign = rPr['w:vertAlign'].val || rPr['w:vertAlign'];
-      if (vertAlign === 'superscript') {
-        css['vertical-align'] = 'super';
-        css['font-size'] = '0.8em';
-      } else if (vertAlign === 'subscript') {
-        css['vertical-align'] = 'sub';
-        css['font-size'] = '0.8em';
-      }
+    
+    if (rPr['w:strike'] || rPr['w:dstrike']) {
+      css['text-decoration'] = 'line-through';
     }
+  }
 
-    // 字符间距
+  /**
+   * 解析上下标
+   */
+  private parseRunAlignment(rPr: any, css: Record<string, string>): void {
+    if (!rPr['w:vertAlign']) return;
+
+    const vertAlign = rPr['w:vertAlign'].val || rPr['w:vertAlign'];
+    if (vertAlign === 'superscript') {
+      css['vertical-align'] = 'super';
+      css['font-size'] = '0.8em';
+    } else if (vertAlign === 'subscript') {
+      css['vertical-align'] = 'sub';
+      css['font-size'] = '0.8em';
+    }
+  }
+
+  /**
+   * 解析字符间距
+   */
+  private parseRunSpacing(rPr: any, css: Record<string, string>): void {
     if (rPr['w:spacing']) {
       const spacingValue = rPr['w:spacing'].val || rPr['w:spacing'];
       if (spacingValue && !isNaN(parseInt(spacingValue))) {
         const spacing = parseInt(spacingValue);
-        css['letter-spacing'] = spacing / 20 + 'pt'; // 转换为点
+        css['letter-spacing'] = spacing / 20 + 'pt';
       }
     }
   }
@@ -357,36 +473,57 @@ export class StyleExtractor {
    * 解析表格属性
    */
   private parseTableProperties(tblPr: any, css: Record<string, string>): void {
-    // 表格宽度
-    if (tblPr['w:tblW']) {
-      const width = tblPr['w:tblW'];
-      if (width.type === 'pct' && width.w && !isNaN(parseInt(width.w))) {
-        css['width'] = parseInt(width.w) / 50 + '%'; // Word 百分比是 50 的倍数
-      } else if (width.type === 'dxa' && width.w && !isNaN(parseInt(width.w))) {
-        css['width'] = this.convertTwipsToPoints(width.w) + 'pt';
-      }
-    }
+    this.parseTableWidth(tblPr, css);
+    this.parseTableBorders(tblPr, css);
+    this.parseTableAlignment(tblPr, css);
+    this.parseTableSpacing(tblPr, css);
+  }
 
-    // 表格边框
+  /**
+   * 解析表格宽度
+   */
+  private parseTableWidth(tblPr: any, css: Record<string, string>): void {
+    if (!tblPr['w:tblW']) return;
+
+    const width = tblPr['w:tblW'];
+    if (width.type === 'pct' && width.w && !isNaN(parseInt(width.w))) {
+      css['width'] = parseInt(width.w) / 50 + '%';
+    } else if (width.type === 'dxa' && width.w && !isNaN(parseInt(width.w))) {
+      css['width'] = this.convertTwipsToPoints(width.w) + 'pt';
+    }
+  }
+
+  /**
+   * 解析表格边框
+   */
+  private parseTableBorders(tblPr: any, css: Record<string, string>): void {
     if (tblPr['w:tblBorders']) {
       this.parseBorders(tblPr['w:tblBorders'], css, 'table');
     }
+  }
 
-    // 表格对齐
-    if (tblPr['w:jc']) {
-      const alignmentValue = tblPr['w:jc'].val || tblPr['w:jc'];
-      if (alignmentValue && typeof alignmentValue === 'string') {
-        css['margin-left'] = alignmentValue === 'center' ? 'auto' : '0';
-        css['margin-right'] = alignmentValue === 'center' ? 'auto' : '0';
-      }
+  /**
+   * 解析表格对齐
+   */
+  private parseTableAlignment(tblPr: any, css: Record<string, string>): void {
+    if (!tblPr['w:jc']) return;
+
+    const alignmentValue = tblPr['w:jc'].val || tblPr['w:jc'];
+    if (alignmentValue && typeof alignmentValue === 'string') {
+      css['margin-left'] = alignmentValue === 'center' ? 'auto' : '0';
+      css['margin-right'] = alignmentValue === 'center' ? 'auto' : '0';
     }
+  }
 
-    // 表格间距
-    if (tblPr['w:tblCellSpacing']) {
-      const spacingValue = tblPr['w:tblCellSpacing'].w;
-      if (spacingValue && !isNaN(parseInt(spacingValue))) {
-        css['border-spacing'] = this.convertTwipsToPoints(spacingValue) + 'pt';
-      }
+  /**
+   * 解析表格间距
+   */
+  private parseTableSpacing(tblPr: any, css: Record<string, string>): void {
+    if (!tblPr['w:tblCellSpacing']) return;
+
+    const spacingValue = tblPr['w:tblCellSpacing'].w;
+    if (spacingValue && !isNaN(parseInt(spacingValue))) {
+      css['border-spacing'] = this.convertTwipsToPoints(spacingValue) + 'pt';
     }
   }
 
@@ -451,35 +588,79 @@ export class StyleExtractor {
    */
   private extractInlineStyles(body: any): void {
     if (!body) return;
+    
+    this.processParagraphs(body);
+    this.processTables(body);
+    this.processChildElements(body);
+  }
+  
+  /**
+   * 处理段落元素
+   */
+  private processParagraphs(body: any): void {
+    if (!body['w:p']) return;
 
-    // 处理段落
-    if (body['w:p']) {
-      const paragraphs = Array.isArray(body['w:p']) ? body['w:p'] : [body['w:p']];
-      for (const paragraph of paragraphs) {
-        this.extractParagraphStyles(paragraph);
-      }
+    const paragraphs = Array.isArray(body['w:p']) ? body['w:p'] : [body['w:p']];
+    for (const paragraph of paragraphs) {
+      this.extractParagraphStyles(paragraph);
     }
+  }
+  
+  /**
+   * 处理表格元素
+   */
+  private processTables(body: any): void {
+    if (!body['w:tbl']) return;
 
-    // 处理表格
-    if (body['w:tbl']) {
-      const tables = Array.isArray(body['w:tbl']) ? body['w:tbl'] : [body['w:tbl']];
-      for (const table of tables) {
-        this.extractTableStyles(table);
-      }
+    const tables = Array.isArray(body['w:tbl']) ? body['w:tbl'] : [body['w:tbl']];
+    for (const table of tables) {
+      this.extractTableStyles(table);
     }
-
-    // 递归处理其他元素
+  }
+  
+  /**
+   * 递归处理子元素
+   */
+  private processChildElements(body: any): void {
     for (const [key, value] of Object.entries(body)) {
-      if (key !== 'w:p' && key !== 'w:tbl' && typeof value === 'object' && value !== null) {
-        if (Array.isArray(value)) {
-          for (const item of value) {
-            if (typeof item === 'object' && item !== null) {
-              this.extractInlineStyles(item);
-            }
-          }
-        } else {
-          this.extractInlineStyles(value);
-        }
+      this.processObjectValue(key, value);
+    }
+  }
+
+  /**
+   * 处理对象值
+   */
+  private processObjectValue(key: string, value: any): void {
+    if (this.shouldSkipKey(key) || !this.isValidObject(value)) return;
+
+    if (Array.isArray(value)) {
+      this.processArrayValue(value);
+    } else {
+      this.extractInlineStyles(value);
+    }
+  }
+
+  /**
+   * 检查是否应该跳过该键
+   */
+  private shouldSkipKey(key: string): boolean {
+    return key === 'w:p' || key === 'w:tbl';
+  }
+
+  /**
+   * 检查是否为有效对象
+   */
+  private isValidObject(value: any): boolean {
+    return typeof value === 'object' && value !== null;
+  }
+
+  /**
+   * 处理数组值
+   */
+  private processArrayValue(array: any[]): void {
+    for (const item of array) {
+      if (this.isValidObject(item)) {
+        this.extractInlineStyles(item);
       }
     }
   }

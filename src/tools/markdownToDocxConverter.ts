@@ -229,116 +229,162 @@ class MarkdownToDocxConverter {
   private async parseMarkdown(markdownContent: string): Promise<ParsedElement[]> {
     const elements: ParsedElement[] = [];
     const lines = markdownContent.split('\n');
-    let currentElement: ParsedElement | null = null;
-    let inCodeBlock = false;
-    let codeBlockContent = '';
-    let inTable = false;
-    let tableRows: string[] = [];
+    const state = {
+      inCodeBlock: false,
+      codeBlockContent: '',
+      inTable: false,
+      tableRows: [] as string[]
+    };
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       const trimmedLine = line.trim();
 
-      // 处理代码块
-      if (trimmedLine.startsWith('```')) {
-        if (inCodeBlock) {
-          // 结束代码块
-          elements.push({
-            type: 'code',
-            content: codeBlockContent.trim(),
-          });
-          inCodeBlock = false;
-          codeBlockContent = '';
-        } else {
-          // 开始代码块
-          inCodeBlock = true;
-        }
+      if (this.processCodeBlock(trimmedLine, line, state, elements)) {
         continue;
       }
 
-      if (inCodeBlock) {
-        codeBlockContent += line + '\n';
+      if (this.processTable(trimmedLine, line, state, elements)) {
         continue;
       }
 
-      // 处理表格
-      if (trimmedLine.includes('|') && !inTable) {
-        inTable = true;
-        tableRows = [line];
+      if (this.processMarkdownElement(trimmedLine, elements)) {
         continue;
-      }
-
-      if (inTable) {
-        if (trimmedLine.includes('|')) {
-          tableRows.push(line);
-          continue;
-        } else {
-          // 结束表格
-          elements.push({
-            type: 'table',
-            content: tableRows.join('\n'),
-          });
-          inTable = false;
-          tableRows = [];
-        }
-      }
-
-      // 处理标题
-      const headingMatch = trimmedLine.match(/^(#{1,6})\s+(.+)$/);
-      if (headingMatch) {
-        elements.push({
-          type: 'heading',
-          level: headingMatch[1].length,
-          content: headingMatch[2],
-        });
-        continue;
-      }
-
-      // 处理水平线
-      if (trimmedLine.match(/^[-*_]{3,}$/)) {
-        elements.push({
-          type: 'hr',
-          content: '',
-        });
-        continue;
-      }
-
-      // 处理引用
-      if (trimmedLine.startsWith('>')) {
-        elements.push({
-          type: 'blockquote',
-          content: trimmedLine.substring(1).trim(),
-        });
-        continue;
-      }
-
-      // 处理列表
-      if (trimmedLine.match(/^[-*+]\s+/) || trimmedLine.match(/^\d+\.\s+/)) {
-        elements.push({
-          type: 'list',
-          content: trimmedLine,
-        });
-        continue;
-      }
-
-      // 处理普通段落
-      if (trimmedLine.length > 0) {
-        elements.push({
-          type: 'paragraph',
-          content: trimmedLine,
-        });
       }
     }
 
-    // 处理未结束的表格
-    if (inTable && tableRows.length > 0) {
+    this.finalizeTable(state, elements);
+    return elements;
+  }
+
+  /**
+   * 处理代码块
+   */
+  private processCodeBlock(
+    trimmedLine: string,
+    line: string,
+    state: any,
+    elements: ParsedElement[]
+  ): boolean {
+    if (trimmedLine.startsWith('```')) {
+      if (state.inCodeBlock) {
+        elements.push({
+          type: 'code',
+          content: state.codeBlockContent.trim(),
+        });
+        state.inCodeBlock = false;
+        state.codeBlockContent = '';
+      } else {
+        state.inCodeBlock = true;
+      }
+      return true;
+    }
+
+    if (state.inCodeBlock) {
+      state.codeBlockContent += line + '\n';
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * 处理表格
+   */
+  private processTable(
+    trimmedLine: string,
+    line: string,
+    state: any,
+    elements: ParsedElement[]
+  ): boolean {
+    if (trimmedLine.includes('|') && !state.inTable) {
+      state.inTable = true;
+      state.tableRows = [line];
+      return true;
+    }
+
+    if (state.inTable) {
+      if (trimmedLine.includes('|')) {
+        state.tableRows.push(line);
+        return true;
+      } else {
+        elements.push({
+          type: 'table',
+          content: state.tableRows.join('\n'),
+        });
+        state.inTable = false;
+        state.tableRows = [];
+        return false;
+      }
+    }
+
+    return false;
+  }
+
+  /**
+   * 处理其他Markdown元素
+   */
+  private processMarkdownElement(trimmedLine: string, elements: ParsedElement[]): boolean {
+    // 处理标题
+    const headingMatch = trimmedLine.match(/^(#{1,6})\s+(.+)$/);
+    if (headingMatch) {
+      elements.push({
+        type: 'heading',
+        level: headingMatch[1].length,
+        content: headingMatch[2],
+      });
+      return true;
+    }
+
+    // 处理水平线
+    if (trimmedLine.match(/^[-*_]{3,}$/)) {
+      elements.push({
+        type: 'hr',
+        content: '',
+      });
+      return true;
+    }
+
+    // 处理引用
+    if (trimmedLine.startsWith('>')) {
+      elements.push({
+        type: 'blockquote',
+        content: trimmedLine.substring(1).trim(),
+      });
+      return true;
+    }
+
+    // 处理列表
+    if (trimmedLine.match(/^[-*+]\s+/) || trimmedLine.match(/^\d+\.\s+/)) {
+      elements.push({
+        type: 'list',
+        content: trimmedLine,
+      });
+      return true;
+    }
+
+    // 处理普通段落
+    if (trimmedLine.length > 0) {
+      elements.push({
+        type: 'paragraph',
+        content: trimmedLine,
+      });
+      return true;
+    }
+
+    return false;
+  }
+
+  /**
+   * 完成表格处理
+   */
+  private finalizeTable(state: any, elements: ParsedElement[]): void {
+    if (state.inTable && state.tableRows.length > 0) {
       elements.push({
         type: 'table',
-        content: tableRows.join('\n'),
+        content: state.tableRows.join('\n'),
       });
     }
-
-    return elements;
   }
 
   /**
@@ -396,25 +442,11 @@ class MarkdownToDocxConverter {
     const level = Math.min(element.level || 1, 6);
     const headingKey = `h${level}` as keyof typeof theme.headingStyles;
     const headingStyle = theme.headingStyles[headingKey];
-
-    // 检测emoji字符 - 扩展Unicode范围以支持更多emoji
-    const emojiRegex =
-      /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA70}-\u{1FAFF}]|[\u{2B50}]|[\u{2B55}]|[\u{231A}-\u{231B}]|[\u{23E9}-\u{23EC}]|[\u{23F0}]|[\u{23F3}]|[\u{25FD}-\u{25FE}]|[\u{2614}-\u{2615}]|[\u{2648}-\u{2653}]|[\u{267F}]|[\u{2693}]|[\u{26A1}]|[\u{26AA}-\u{26AB}]|[\u{26BD}-\u{26BE}]|[\u{26C4}-\u{26C5}]|[\u{26CE}]|[\u{26D4}]|[\u{26EA}]|[\u{26F2}-\u{26F3}]|[\u{26F5}]|[\u{26FA}]|[\u{26FD}]|[\u{2705}]|[\u{270A}-\u{270B}]|[\u{2728}]|[\u{274C}]|[\u{274E}]|[\u{2753}-\u{2755}]|[\u{2757}]|[\u{2795}-\u{2797}]|[\u{27B0}]|[\u{27BF}]|[\u{2934}-\u{2935}]|[\u{2B05}-\u{2B07}]|[\u{2B1B}-\u{2B1C}]|[\u{3030}]|[\u{303D}]|[\u{3297}]|[\u{3299}]/gu;
-    const hasEmoji = emojiRegex.test(element.content);
+    const hasEmoji = this.detectEmoji(element.content);
+    const headingLevel = this.getHeadingLevel(level);
 
     return new Paragraph({
-      heading:
-        level === 1
-          ? HeadingLevel.HEADING_1
-          : level === 2
-            ? HeadingLevel.HEADING_2
-            : level === 3
-              ? HeadingLevel.HEADING_3
-              : level === 4
-                ? HeadingLevel.HEADING_4
-                : level === 5
-                  ? HeadingLevel.HEADING_5
-                  : HeadingLevel.HEADING_6,
+      heading: headingLevel,
       children: [
         new TextRun({
           text: element.content,
@@ -429,6 +461,30 @@ class MarkdownToDocxConverter {
         after: 120, // 6pt
       },
     });
+  }
+
+  /**
+   * 检测emoji字符
+   */
+  private detectEmoji(content: string): boolean {
+    const emojiRegex =
+      /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F900}-\u{1F9FF}]|[\u{1FA70}-\u{1FAFF}]|[\u{2B50}]|[\u{2B55}]|[\u{231A}-\u{231B}]|[\u{23E9}-\u{23EC}]|[\u{23F0}]|[\u{23F3}]|[\u{25FD}-\u{25FE}]|[\u{2614}-\u{2615}]|[\u{2648}-\u{2653}]|[\u{267F}]|[\u{2693}]|[\u{26A1}]|[\u{26AA}-\u{26AB}]|[\u{26BD}-\u{26BE}]|[\u{26C4}-\u{26C5}]|[\u{26CE}]|[\u{26D4}]|[\u{26EA}]|[\u{26F2}-\u{26F3}]|[\u{26F5}]|[\u{26FA}]|[\u{26FD}]|[\u{2705}]|[\u{270A}-\u{270B}]|[\u{2728}]|[\u{274C}]|[\u{274E}]|[\u{2753}-\u{2755}]|[\u{2757}]|[\u{2795}-\u{2797}]|[\u{27B0}]|[\u{27BF}]|[\u{2934}-\u{2935}]|[\u{2B05}-\u{2B07}]|[\u{2B1B}-\u{2B1C}]|[\u{3030}]|[\u{303D}]|[\u{3297}]|[\u{3299}]/gu;
+    return emojiRegex.test(content);
+  }
+
+  /**
+   * 获取标题级别
+   */
+  private getHeadingLevel(level: number) {
+    const headingLevels = [
+      HeadingLevel.HEADING_1,
+      HeadingLevel.HEADING_2,
+      HeadingLevel.HEADING_3,
+      HeadingLevel.HEADING_4,
+      HeadingLevel.HEADING_5,
+      HeadingLevel.HEADING_6,
+    ];
+    return headingLevels[level - 1] || HeadingLevel.HEADING_6;
   }
 
   /**

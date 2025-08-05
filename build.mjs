@@ -72,8 +72,8 @@ build({
 
     // Make the binary executable
     try {
-      const { execSync } = await import('child_process');
-      execSync('chmod +x dist/index.cjs');
+      const { chmodSync } = await import('fs');
+      chmodSync('dist/index.cjs', 0o755);
       console.log('✅ Binary permissions set');
     } catch (error) {
       console.warn('⚠️  Could not set binary permissions:', error.message);

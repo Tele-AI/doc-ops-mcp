@@ -349,138 +349,134 @@ class EnhancedHtmlToDocxConverter {
     const html = element.html;
 
     if (!html) {
-      const { highlight, ...safeStyle } = baseStyle;
-      runs.push(
-        new TextRun({
-          text: element.text,
-          ...safeStyle,
-          ...(highlight && { highlight }),
-        })
-      );
-      return runs;
+      return [this.createSimpleTextRun(element.text, baseStyle)];
     }
 
     const $content = $(html);
 
-    // 处理富文本内容
-    const processNode = (node: any) => {
-      if (node.type === 'text') {
-        if (node.data.trim()) {
-          const textOptions: any = {
-            text: node.data,
-            bold: baseStyle.bold,
-            italics: baseStyle.italics,
-            size: baseStyle.size,
-            color: baseStyle.color,
-          };
-          if (baseStyle.underline) {
-            textOptions.underline = baseStyle.underline;
-          }
-          runs.push(new TextRun(textOptions));
-        }
-      } else if (node.type === 'tag') {
-        const tagStyle = { ...baseStyle };
-        const $node = $(node);
-
-        // 根据标签添加样式
-        switch (node.name) {
-          case 'strong':
-          case 'b':
-            tagStyle.bold = true;
-            break;
-          case 'em':
-          case 'i':
-            tagStyle.italics = true;
-            break;
-          case 'u':
-            tagStyle.underline = {
-              type: UnderlineType.SINGLE,
-            };
-            break;
-          case 'del':
-          case 'strike':
-            (tagStyle as any).strike = true;
-            break;
-          case 'code':
-            // 内联代码样式
-            tagStyle.size = 18;
-            tagStyle.color = 'd73a49';
-            break;
-        }
-
-        // 提取该节点的样式
-        const nodeStyles = this.extractStyles($node);
-        const nodeDocxStyle = this.convertCssToDocx(nodeStyles);
-        Object.assign(tagStyle, nodeDocxStyle);
-
-        let text = $node.text();
-        if (text.trim()) {
-          // 解码HTML实体
-          text = this.decodeHtmlEntities(text);
-
-          const nodeOptions: any = {
-            text: text,
-            bold: tagStyle.bold,
-            italics: tagStyle.italics,
-            size: tagStyle.size,
-            color: tagStyle.color,
-          };
-
-          // 为代码添加等宽字体
-          if (node.name === 'code') {
-            nodeOptions.font = {
-              name: 'Consolas',
-            };
-          } else {
-            // 为普通文本设置支持emoji的字体
-            nodeOptions.font = {
-              name: 'Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Microsoft YaHei, SimHei, Arial, sans-serif',
-            };
-          }
-
-          if (tagStyle.underline) {
-            nodeOptions.underline = tagStyle.underline;
-          }
-          if ((tagStyle as any).strike) {
-            nodeOptions.strike = (tagStyle as any).strike;
-          }
-          runs.push(new TextRun(nodeOptions));
-        }
-      }
-    };
-
-    // 处理直接文本内容
     if ($content.length === 0) {
-      // 纯文本
-      const runOptions: any = {
-        text: element.text,
+      return [this.createSimpleTextRun(element.text, baseStyle)];
+    }
+
+    $content.contents().each((i: number, node: any) => {
+      this.processHtmlNode(node, baseStyle, runs, $);
+    });
+
+    return runs.length > 0 ? runs : [this.createSimpleTextRun(element.text, baseStyle)];
+  }
+
+  private createSimpleTextRun(text: string, baseStyle: StyleMapping): any {
+    const { highlight, ...safeStyle } = baseStyle;
+    return new TextRun({
+      text,
+      ...safeStyle,
+      ...(highlight && { highlight }),
+    });
+  }
+
+  private processHtmlNode(node: any, baseStyle: StyleMapping, runs: any[], $: any): void {
+    if (node.type === 'text') {
+      this.processTextNode(node, baseStyle, runs);
+    } else if (node.type === 'tag') {
+      this.processTagNode(node, baseStyle, runs, $);
+    }
+  }
+
+  private processTextNode(node: any, baseStyle: StyleMapping, runs: any[]): void {
+    if (node.data.trim()) {
+      const textOptions: any = {
+        text: node.data,
         bold: baseStyle.bold,
         italics: baseStyle.italics,
         size: baseStyle.size,
         color: baseStyle.color,
       };
       if (baseStyle.underline) {
-        runOptions.underline = baseStyle.underline;
+        textOptions.underline = baseStyle.underline;
       }
-      runs.push(new TextRun(runOptions));
+      runs.push(new TextRun(textOptions));
+    }
+  }
+
+  private processTagNode(node: any, baseStyle: StyleMapping, runs: any[], $: any): void {
+    const tagStyle = this.applyTagStyles(node, baseStyle, $);
+    const text = $(node).text();
+    
+    if (text.trim()) {
+      const decodedText = this.decodeHtmlEntities(text);
+      const nodeOptions = this.createNodeOptions(decodedText, tagStyle, node.name);
+      runs.push(new TextRun(nodeOptions));
+    }
+  }
+
+  private applyTagStyles(node: any, baseStyle: StyleMapping, $: any): StyleMapping {
+    const tagStyle = { ...baseStyle };
+    const $node = $(node);
+
+    // 根据标签添加样式
+    this.applyBasicTagStyles(node.name, tagStyle);
+
+    // 提取该节点的样式
+    const nodeStyles = this.extractStyles($node);
+    const nodeDocxStyle = this.convertCssToDocx(nodeStyles);
+    Object.assign(tagStyle, nodeDocxStyle);
+
+    return tagStyle;
+  }
+
+  private applyBasicTagStyles(tagName: string, tagStyle: StyleMapping): void {
+    switch (tagName) {
+      case 'strong':
+      case 'b':
+        tagStyle.bold = true;
+        break;
+      case 'em':
+      case 'i':
+        tagStyle.italics = true;
+        break;
+      case 'u':
+        tagStyle.underline = {
+          type: UnderlineType.SINGLE,
+        };
+        break;
+      case 'del':
+      case 'strike':
+        (tagStyle as any).strike = true;
+        break;
+      case 'code':
+        tagStyle.size = 18;
+        tagStyle.color = 'd73a49';
+        break;
+    }
+  }
+
+  private createNodeOptions(text: string, tagStyle: StyleMapping, tagName: string): any {
+    const nodeOptions: any = {
+      text,
+      bold: tagStyle.bold,
+      italics: tagStyle.italics,
+      size: tagStyle.size,
+      color: tagStyle.color,
+    };
+
+    // 设置字体
+    if (tagName === 'code') {
+      nodeOptions.font = { name: 'Consolas' };
     } else {
-      // 包含HTML标签的内容
-      $content.contents().each((i: number, node: any) => {
-        processNode(node);
-      });
+      nodeOptions.font = {
+        name: 'Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Microsoft YaHei, SimHei, Arial, sans-serif',
+      };
     }
 
-    const fallbackOptions: any = {
-      text: element.text,
-      bold: baseStyle.bold,
-      italics: baseStyle.italics,
-      size: baseStyle.size,
-      color: baseStyle.color,
-    };
-    if (baseStyle.underline) {
-      fallbackOptions.underline = baseStyle.underline;
+    // 添加其他样式
+    if (tagStyle.underline) {
+      nodeOptions.underline = tagStyle.underline;
     }
-    return runs.length > 0 ? runs : [new TextRun(fallbackOptions)];
+    if ((tagStyle as any).strike) {
+      nodeOptions.strike = (tagStyle as any).strike;
+    }
+
+    return nodeOptions;
   }
 
   private createListElements(element: ParsedElement, baseStyle: StyleMapping, $: any): any[] {
@@ -612,65 +608,84 @@ class EnhancedHtmlToDocxConverter {
   private convertCssToDocx(styles: any): StyleMapping {
     const docxStyle: StyleMapping = {};
 
-    // 字体大小转换
+    this.convertFontSize(styles, docxStyle);
+    this.convertColor(styles, docxStyle);
+    this.convertBackgroundColor(styles, docxStyle);
+    this.convertFontWeight(styles, docxStyle);
+    this.convertFontStyle(styles, docxStyle);
+    this.convertTextDecoration(styles, docxStyle);
+    this.convertTextAlign(styles, docxStyle);
+
+    return docxStyle;
+  }
+
+  private convertFontSize(styles: any, docxStyle: StyleMapping): void {
     if (styles['font-size']) {
       const fontSize = this.parseFontSize(styles['font-size']);
       if (fontSize) {
         docxStyle.size = fontSize;
       }
     }
+  }
 
-    // 颜色转换
+  private convertColor(styles: any, docxStyle: StyleMapping): void {
     if (styles['color']) {
       const color = this.parseColor(styles['color']);
       if (color) {
         docxStyle.color = color;
       }
     }
+  }
 
-    // 背景色转换为高亮
+  private convertBackgroundColor(styles: any, docxStyle: StyleMapping): void {
     if (styles['background-color']) {
       const bgColor = this.parseColor(styles['background-color']);
       if (bgColor) {
-        // 将颜色映射到允许的highlight值
-        const highlightMap: { [key: string]: StyleMapping['highlight'] } = {
-          '#ffff00': 'yellow',
-          '#00ff00': 'green',
-          '#00ffff': 'cyan',
-          '#ff00ff': 'magenta',
-          '#0000ff': 'blue',
-          '#ff0000': 'red',
-          '#000080': 'darkBlue',
-          '#008080': 'darkCyan',
-          '#008000': 'darkGreen',
-          '#800080': 'darkMagenta',
-          '#800000': 'darkRed',
-          '#808000': 'darkYellow',
-          '#808080': 'darkGray',
-          '#c0c0c0': 'lightGray',
-          '#000000': 'black',
-          '#ffffff': 'white'
-        };
-        docxStyle.highlight = highlightMap[bgColor.toLowerCase()] || 'yellow';
+        docxStyle.highlight = this.mapColorToHighlight(bgColor);
       }
     }
+  }
 
-    // 字体粗细
+  private mapColorToHighlight(bgColor: string): StyleMapping['highlight'] {
+    const highlightMap: { [key: string]: StyleMapping['highlight'] } = {
+      '#ffff00': 'yellow',
+      '#00ff00': 'green',
+      '#00ffff': 'cyan',
+      '#ff00ff': 'magenta',
+      '#0000ff': 'blue',
+      '#ff0000': 'red',
+      '#000080': 'darkBlue',
+      '#008080': 'darkCyan',
+      '#008000': 'darkGreen',
+      '#800080': 'darkMagenta',
+      '#800000': 'darkRed',
+      '#808000': 'darkYellow',
+      '#808080': 'darkGray',
+      '#c0c0c0': 'lightGray',
+      '#000000': 'black',
+      '#ffffff': 'white'
+    };
+    return highlightMap[bgColor.toLowerCase()] || 'yellow';
+  }
+
+  private convertFontWeight(styles: any, docxStyle: StyleMapping): void {
     if (styles['font-weight']) {
       const weight = styles['font-weight'].toLowerCase();
       if (weight === 'bold' || weight === 'bolder' || parseInt(weight) >= 600) {
         docxStyle.bold = true;
       }
     }
+  }
 
-    // 字体样式
+  private convertFontStyle(styles: any, docxStyle: StyleMapping): void {
     if (styles['font-style']) {
       if (styles['font-style'].toLowerCase() === 'italic') {
         docxStyle.italics = true;
       }
     }
+  }
 
-    // 文本装饰
+  private convertTextDecoration(styles: any, docxStyle: StyleMapping): void {
     if (styles['text-decoration']) {
       const decoration = styles['text-decoration'].toLowerCase();
       if (decoration.includes('underline')) {
@@ -679,8 +694,9 @@ class EnhancedHtmlToDocxConverter {
         };
       }
     }
+  }
 
-    // 文本对齐
+  private convertTextAlign(styles: any, docxStyle: StyleMapping): void {
     if (styles['text-align']) {
       const align = styles['text-align'].toLowerCase();
       switch (align) {
@@ -697,8 +713,6 @@ class EnhancedHtmlToDocxConverter {
           docxStyle.alignment = AlignmentType.LEFT;
       }
     }
-
-    return docxStyle;
   }
 
   private parseFontSize(value: string): number | null {

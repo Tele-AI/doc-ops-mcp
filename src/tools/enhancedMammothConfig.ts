@@ -105,7 +105,9 @@ export async function convertDocxToHtmlWithStyles(inputPath: string, options: an
       config.convertImage = mammoth.images.imgElement(function (image) {
         return image.read().then(async function (imageBuffer) {
           const extension = image.contentType.split('/')[1] || 'png';
-          const filename = `image_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${extension}`;
+          const crypto = require('crypto');
+          const randomId = crypto.randomBytes(4).toString('hex');
+          const filename = `image_${Date.now()}_${randomId}.${extension}`;
           const imagePath = path.join(imageDir, filename);
 
           await fs.writeFile(imagePath, imageBuffer);

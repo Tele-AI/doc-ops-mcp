@@ -460,8 +460,9 @@ export class MediaHandler {
    * 生成媒体文件 ID
    */
   private generateMediaId(fileName: string): string {
+    const crypto = require('crypto');
     const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
+    const random = crypto.randomBytes(3).toString('hex');
     const name = path.parse(fileName).name;
     return `${name}_${timestamp}_${random}`;
   }

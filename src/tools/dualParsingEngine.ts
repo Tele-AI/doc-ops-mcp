@@ -182,137 +182,43 @@ export class DualParsingEngine {
     const startTime = Date.now();
 
     try {
-      if (this.options.debugOptions?.logProgress) {
-        console.log('🚀 开始双重解析引擎转换...');
-        console.log(`📄 输入文件: ${inputPath}`);
-      }
+      this.logProgress('🚀 开始双重解析引擎转换...', `📄 输入文件: ${inputPath}`);
 
-      // 步骤0: 深度解析 DOCX 文件结构（基于测试脚本验证的方法）
-      const deepParseStart = Date.now();
-      if (this.options.debugOptions?.logProgress) {
-        console.log('🔍 步骤0: 深度解析 DOCX 文件结构...');
-      }
+      // 步骤0: 深度解析 DOCX 文件结构
+      const deepParseTime = await this.performDeepParse(inputPath);
 
-      await this.deepParseDocxStructure(inputPath);
-      const deepParseTime = Date.now() - deepParseStart;
-
-      // 步骤1: 样式提取 - 使用增强的样式解析
-      const styleExtractionStart = Date.now();
-      let styles: Map<string, StyleDefinition> = new Map();
-      let documentStyles: DocumentStyle[] = [];
-
-      if (this.options.extractStyles) {
-        if (this.options.debugOptions?.logProgress) {
-          console.log('🎨 步骤1: 提取样式信息...');
-        }
-
-        const styleResult = await this.styleExtractor.extractStyles(inputPath);
-        styles = styleResult.styles;
-        documentStyles = styleResult.documentStyles;
-
-        // 合并深度解析的样式
-        this.mergeExtractedStyles(styles);
-
-        // 设置样式到其他组件
-        this.cssGenerator.setStyles(styles, documentStyles);
-        // htmlPostProcessor.setStyles removed
-      }
-      const styleExtractionTime = Date.now() - styleExtractionStart + deepParseTime;
+      // 步骤1: 样式提取
+      const { styles, documentStyles, styleExtractionTime } = await this.performStyleExtraction(inputPath, deepParseTime);
 
       // 步骤2: 媒体文件提取
-      const mediaExtractionStart = Date.now();
-      let mediaResult: ExtractionResult;
-
-      if (this.options.debugOptions?.logProgress) {
-        console.log('🖼️ 步骤2: 提取媒体文件...');
-      }
-
-      mediaResult = await this.mediaHandler.extractMedia(inputPath);
-      const mediaExtractionTime = Date.now() - mediaExtractionStart;
+      const { mediaResult, mediaExtractionTime } = await this.performMediaExtraction(inputPath);
 
       // 步骤3: Mammoth 转换
-      const mammothConversionStart = Date.now();
-
-      if (this.options.debugOptions?.logProgress) {
-        console.log('🔄 步骤3: Mammoth 增强转换...');
-      }
-
-      const mammothResult = await this.enhancedMammothConversion(inputPath, styles);
-
-      if (!mammothResult.success) {
-        throw new Error(`Mammoth 转换失败: ${mammothResult.error}`);
-      }
-
-      const mammothConversionTime = Date.now() - mammothConversionStart;
+      const { mammothResult, mammothConversionTime } = await this.performMammothConversion(inputPath, styles);
 
       // 步骤4: CSS 生成
-      const cssGenerationStart = Date.now();
-
-      if (this.options.debugOptions?.logProgress) {
-        console.log('🎨 步骤4: 生成 CSS 规则...');
-        console.log(`📊 可用样式数量: ${styles.size}`);
-      }
-
-      const cssResult = await this.generateEnhancedCSS(
-        styles,
-        mammothResult.html,
-        mediaResult.mediaFiles
-      );
-
-      if (this.options.debugOptions?.logProgress) {
-        console.log('🔍 CSS生成结果分析:', {
-          baseStylesLength: cssResult.baseStyles?.length || 0,
-          customStylesLength: cssResult.customStyles?.length || 0,
-          responsiveStylesLength: cssResult.responsiveStyles?.length || 0,
-          printStylesLength: cssResult.printStyles?.length || 0,
-          completeLength: cssResult.complete?.length || 0,
-        });
-      }
-
-      const cssGenerationTime = Date.now() - cssGenerationStart;
+      const { cssResult, cssGenerationTime } = await this.performCSSGeneration(styles, mammothResult, mediaResult);
 
       // 步骤5: HTML 后处理
-      const htmlProcessingStart = Date.now();
-
-      if (this.options.debugOptions?.logProgress) {
-        console.log('🔧 步骤5: HTML 后处理...');
-      }
-
-      const htmlResult = await this.enhanceHtmlWithCompleteStyles(mammothResult.html, cssResult);
-      const htmlProcessingTime = Date.now() - htmlProcessingStart;
+      const { htmlResult, htmlProcessingTime } = await this.performHTMLProcessing(mammothResult, cssResult);
 
       // 步骤6: 生成最终输出
-      if (this.options.debugOptions?.logProgress) {
-        console.log('📦 步骤6: 生成最终输出...');
-      }
+      const { finalHTML, enhancedCSS } = this.generateFinalOutput(htmlResult, cssResult, mammothResult, mediaResult);
 
-      const finalHTML = htmlResult.html;
-      const finalCSS = this.combineCSSResults(cssResult, mammothResult.css);
-
-      // 确保至少有基本的Word样式
-      const enhancedCSS = this.ensureBasicWordStyles(finalCSS);
+      // 保存中间结果（如果启用调试）
+      await this.saveIntermediateResultsIfEnabled({
+        styles,
+        mammothResult,
+        cssResult,
+        htmlResult,
+        mediaResult,
+      });
 
       const completeHTML = this.generateCompleteHTML(
         finalHTML,
         enhancedCSS,
         mediaResult.mediaFiles
       );
-
-      if (this.options.debugOptions?.logProgress) {
-        console.log(`📄 最终HTML长度: ${completeHTML.length} 字符`);
-        console.log('🔍 HTML包含样式:', completeHTML.includes('<style>'));
-      }
-
-      // 保存中间结果（如果启用调试）
-      if (this.options.debugOptions?.saveIntermediateResults) {
-        await this.saveIntermediateResults({
-          styles,
-          mammothResult,
-          cssResult,
-          htmlResult,
-          mediaResult,
-        });
-      }
 
       const totalTime = Date.now() - startTime;
 
@@ -620,6 +526,143 @@ ${processedHtml}
   /**
    * 保存中间结果
    */
+  private logProgress(...messages: string[]): void {
+    if (this.options.debugOptions?.logProgress) {
+      messages.forEach(message => console.log(message));
+    }
+  }
+
+  private async performDeepParse(inputPath: string): Promise<number> {
+    const deepParseStart = Date.now();
+    this.logProgress('🔍 步骤0: 深度解析 DOCX 文件结构...');
+    await this.deepParseDocxStructure(inputPath);
+    return Date.now() - deepParseStart;
+  }
+
+  private async performStyleExtraction(inputPath: string, deepParseTime: number): Promise<{
+    styles: Map<string, StyleDefinition>;
+    documentStyles: DocumentStyle[];
+    styleExtractionTime: number;
+  }> {
+    const styleExtractionStart = Date.now();
+    let styles: Map<string, StyleDefinition> = new Map();
+    let documentStyles: DocumentStyle[] = [];
+
+    if (this.options.extractStyles) {
+      this.logProgress('🎨 步骤1: 提取样式信息...');
+      const styleResult = await this.styleExtractor.extractStyles(inputPath);
+      styles = styleResult.styles;
+      documentStyles = styleResult.documentStyles;
+      this.mergeExtractedStyles(styles);
+      this.cssGenerator.setStyles(styles, documentStyles);
+    }
+    
+    return {
+      styles,
+      documentStyles,
+      styleExtractionTime: Date.now() - styleExtractionStart + deepParseTime
+    };
+  }
+
+  private async performMediaExtraction(inputPath: string): Promise<{
+    mediaResult: ExtractionResult;
+    mediaExtractionTime: number;
+  }> {
+    const mediaExtractionStart = Date.now();
+    this.logProgress('🖼️ 步骤2: 提取媒体文件...');
+    const mediaResult = await this.mediaHandler.extractMedia(inputPath);
+    return {
+      mediaResult,
+      mediaExtractionTime: Date.now() - mediaExtractionStart
+    };
+  }
+
+  private async performMammothConversion(inputPath: string, styles: Map<string, StyleDefinition>): Promise<{
+    mammothResult: ConversionResult;
+    mammothConversionTime: number;
+  }> {
+    const mammothConversionStart = Date.now();
+    this.logProgress('🔄 步骤3: Mammoth 增强转换...');
+    const mammothResult = await this.enhancedMammothConversion(inputPath, styles);
+    
+    if (!mammothResult.success) {
+      throw new Error(`Mammoth 转换失败: ${mammothResult.error}`);
+    }
+    
+    return {
+      mammothResult,
+      mammothConversionTime: Date.now() - mammothConversionStart
+    };
+  }
+
+  private async performCSSGeneration(styles: Map<string, StyleDefinition>, mammothResult: ConversionResult, mediaResult: ExtractionResult): Promise<{
+    cssResult: GeneratedCSS;
+    cssGenerationTime: number;
+  }> {
+    const cssGenerationStart = Date.now();
+    this.logProgress('🎨 步骤4: 生成 CSS 规则...', `📊 可用样式数量: ${styles.size}`);
+    
+    const cssResult = await this.generateEnhancedCSS(
+      styles,
+      mammothResult.html,
+      mediaResult.mediaFiles
+    );
+    
+    if (this.options.debugOptions?.logProgress) {
+      console.log('🔍 CSS生成结果分析:', {
+        baseStylesLength: cssResult.baseStyles?.length || 0,
+        customStylesLength: cssResult.customStyles?.length || 0,
+        responsiveStylesLength: cssResult.responsiveStyles?.length || 0,
+        printStylesLength: cssResult.printStyles?.length || 0,
+        completeLength: cssResult.complete?.length || 0,
+      });
+    }
+    
+    return {
+      cssResult,
+      cssGenerationTime: Date.now() - cssGenerationStart
+    };
+  }
+
+  private async performHTMLProcessing(mammothResult: ConversionResult, cssResult: GeneratedCSS): Promise<{
+    htmlResult: any;
+    htmlProcessingTime: number;
+  }> {
+    const htmlProcessingStart = Date.now();
+    this.logProgress('🔧 步骤5: HTML 后处理...');
+    const htmlResult = await this.enhanceHtmlWithCompleteStyles(mammothResult.html, cssResult);
+    return {
+      htmlResult,
+      htmlProcessingTime: Date.now() - htmlProcessingStart
+    };
+  }
+
+  private generateFinalOutput(htmlResult: any, cssResult: GeneratedCSS, mammothResult: ConversionResult, mediaResult: ExtractionResult): {
+    finalHTML: string;
+    enhancedCSS: string;
+  } {
+    this.logProgress('📦 步骤6: 生成最终输出...');
+    const finalHTML = htmlResult.html;
+    const finalCSS = this.combineCSSResults(cssResult, mammothResult.css);
+    const enhancedCSS = this.ensureBasicWordStyles(finalCSS);
+    
+    const completeHTML = this.generateCompleteHTML(
+      finalHTML,
+      enhancedCSS,
+      mediaResult.mediaFiles
+    );
+    
+    this.logProgress(`📄 最终HTML长度: ${completeHTML.length} 字符`, `🔍 HTML包含样式: ${completeHTML.includes('<style>')}`);
+    
+    return { finalHTML, enhancedCSS };
+  }
+
+  private async saveIntermediateResultsIfEnabled(results: any): Promise<void> {
+    if (this.options.debugOptions?.saveIntermediateResults) {
+      await this.saveIntermediateResults(results);
+    }
+  }
+
   private async saveIntermediateResults(results: any): Promise<void> {
     if (!this.options.debugOptions?.outputDirectory) {
       return;

@@ -213,60 +213,30 @@ class EnhancedHtmlToMarkdownConverter {
       return '';
     }
 
+    return this.convertTagToMarkdown(tagName, text, element, $);
+  }
+
+  private convertTagToMarkdown(tagName: string, text: string, element: any, $: any): string {
+    // 处理标题
+    if (this.isHeadingTag(tagName)) {
+      return this.convertHeadingToMarkdown(tagName, text);
+    }
+
+    // 处理基本格式化标签
+    if (this.isFormattingTag(tagName)) {
+      return this.convertFormattingToMarkdown(tagName, text);
+    }
+
+    // 处理特殊元素
     switch (tagName) {
-      case 'h1':
-        return `# ${text}\n\n`;
-      case 'h2':
-        return `## ${text}\n\n`;
-      case 'h3':
-        return `### ${text}\n\n`;
-      case 'h4':
-        return `#### ${text}\n\n`;
-      case 'h5':
-        return `##### ${text}\n\n`;
-      case 'h6':
-        return `###### ${text}\n\n`;
       case 'p':
         return `${this.processInlineElements($, element)}\n\n`;
-      case 'strong':
-      case 'b':
-        return `**${text}**`;
-      case 'em':
-      case 'i':
-        return `*${text}*`;
-      case 'code':
-        return `\`${text}\``;
       case 'pre':
-        // 尝试从code子元素中提取语言信息
-        const codeElement = element.find('code').first();
-        let language = '';
-        if (codeElement.length > 0) {
-          const className = codeElement.attr('class') || '';
-          const languageMatch = className.match(/language-([\w-]+)/);
-          if (languageMatch) {
-            language = languageMatch[1];
-          }
-        }
-        return `\`\`\`${language}\n${text}\n\`\`\`\n\n`;
+        return this.convertPreToMarkdown(element, text);
       case 'a':
-        const href = element.attr('href');
-        return href ? `[${text}](${href})` : text;
+        return this.convertLinkToMarkdown(element, text);
       case 'img':
-        const src = element.attr('src');
-        const alt = element.attr('alt') || 'Image';
-        const title = element.attr('title') || '';
-        const dataOriginalPath = element.attr('data-original-path');
-
-        // 优先使用src属性（相对路径），如果没有则使用原始路径
-        const imagePath = dataOriginalPath || src;
-        if (imagePath) {
-          let finalPath = src || imagePath;
-          if (!finalPath.startsWith('./') && !finalPath.startsWith('/')) {
-            finalPath = `./${finalPath}`;
-          }
-          return title ? `![${alt}](${finalPath} "${title}")\n\n` : `![${alt}](${finalPath})\n\n`;
-        }
-        return '';
+        return this.convertImageToMarkdown(element);
       case 'ul':
         return this.processListToMarkdown($, element, 'ul');
       case 'ol':
@@ -284,21 +254,87 @@ class EnhancedHtmlToMarkdownConverter {
       case 'span':
       case 'section':
       case 'article':
-        // 处理块级元素，优先使用内联元素处理（包含图片）
-        const inlineContent = this.processInlineElements($, element);
-        if (inlineContent.trim()) {
-          return inlineContent + '\n';
-        }
-
-        // 如果内联处理没有结果，则递归处理子元素
-        let divContent = '';
-        element.children().each((i: number, child: any) => {
-          divContent += this.processElementToMarkdown($, $(child));
-        });
-        return divContent || (text ? `${text}\n` : '');
+        return this.convertContainerToMarkdown($, element, text);
       default:
         return text ? `${text}\n` : '';
     }
+  }
+
+  private isHeadingTag(tagName: string): boolean {
+    return ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName);
+  }
+
+  private isFormattingTag(tagName: string): boolean {
+    return ['strong', 'b', 'em', 'i', 'code'].includes(tagName);
+  }
+
+  private convertHeadingToMarkdown(tagName: string, text: string): string {
+    const level = parseInt(tagName.charAt(1));
+    const hashes = '#'.repeat(level);
+    return `${hashes} ${text}\n\n`;
+  }
+
+  private convertFormattingToMarkdown(tagName: string, text: string): string {
+    switch (tagName) {
+      case 'strong':
+      case 'b':
+        return `**${text}**`;
+      case 'em':
+      case 'i':
+        return `*${text}*`;
+      case 'code':
+        return `\`${text}\``;
+      default:
+        return text;
+    }
+  }
+
+  private convertPreToMarkdown(element: any, text: string): string {
+    const codeElement = element.find('code').first();
+    let language = '';
+    if (codeElement.length > 0) {
+      const className = codeElement.attr('class') || '';
+      const languageMatch = className.match(/language-([\w-]+)/);
+      if (languageMatch) {
+        language = languageMatch[1];
+      }
+    }
+    return `\`\`\`${language}\n${text}\n\`\`\`\n\n`;
+  }
+
+  private convertLinkToMarkdown(element: any, text: string): string {
+    const href = element.attr('href');
+    return href ? `[${text}](${href})` : text;
+  }
+
+  private convertImageToMarkdown(element: any): string {
+    const src = element.attr('src');
+    const alt = element.attr('alt') || 'Image';
+    const title = element.attr('title') || '';
+    const dataOriginalPath = element.attr('data-original-path');
+
+    const imagePath = dataOriginalPath || src;
+    if (imagePath) {
+      let finalPath = src || imagePath;
+      if (!finalPath.startsWith('./') && !finalPath.startsWith('/')) {
+        finalPath = `./${finalPath}`;
+      }
+      return title ? `![${alt}](${finalPath} "${title}")\n\n` : `![${alt}](${finalPath})\n\n`;
+    }
+    return '';
+  }
+
+  private convertContainerToMarkdown($: any, element: any, text: string): string {
+    const inlineContent = this.processInlineElements($, element);
+    if (inlineContent.trim()) {
+      return inlineContent + '\n';
+    }
+
+    let divContent = '';
+    element.children().each((i: number, child: any) => {
+      divContent += this.processElementToMarkdown($, $(child));
+    });
+    return divContent || (text ? `${text}\n` : '');
   }
 
   /**
@@ -364,78 +400,90 @@ class EnhancedHtmlToMarkdownConverter {
       if (node.type === 'text') {
         result += this.decodeHtmlEntities($(node).text());
       } else if (node.type === 'tag') {
-        const $node = $(node);
-        const tagName = $node.prop('tagName')?.toLowerCase();
-        const nodeText = this.decodeHtmlEntities($node.text());
-
-        switch (tagName) {
-          case 'strong':
-          case 'b':
-            result += `**${nodeText}**`;
-            break;
-          case 'em':
-          case 'i':
-            result += `*${nodeText}*`;
-            break;
-          case 'code':
-            result += `\`${nodeText}\``;
-            break;
-          case 'a':
-            const href = $node.attr('href');
-            result += href ? `[${nodeText}](${href})` : nodeText;
-            break;
-          case 'img':
-            const src = $node.attr('src');
-            const alt = $node.attr('alt') || 'Image';
-            const title = $node.attr('title') || '';
-            const dataOriginalPath = $node.attr('data-original-path');
-
-            // 优先使用src属性（相对路径），如果没有则使用原始路径
-            const imagePath = dataOriginalPath || src;
-            if (imagePath) {
-              let finalPath = src || imagePath;
-              if (!finalPath.startsWith('./') && !finalPath.startsWith('/')) {
-                finalPath = `./${finalPath}`;
-              }
-              result += title ? `![${alt}](${finalPath} "${title}")` : `![${alt}](${finalPath})`;
-            }
-            break;
-          case 'span':
-            // 检查span内是否包含图片
-            const imgElement = $node.find('img');
-            if (imgElement.length > 0) {
-              imgElement.each((j: number, img: any) => {
-                const $img = $(img);
-                const imgSrc = $img.attr('src');
-                const imgAlt = $img.attr('alt') || 'Image';
-                const imgTitle = $img.attr('title') || '';
-                const imgDataOriginalPath = $img.attr('data-original-path');
-                const imgImagePath = imgDataOriginalPath || imgSrc;
-
-                if (imgImagePath) {
-                  let imgFinalPath = imgSrc || imgImagePath;
-                  if (!imgFinalPath.startsWith('./') && !imgFinalPath.startsWith('/')) {
-                    imgFinalPath = `./${imgFinalPath}`;
-                  }
-                  result += imgTitle
-                    ? `![${imgAlt}](${imgFinalPath} "${imgTitle}")`
-                    : `![${imgAlt}](${imgFinalPath})`;
-                }
-              });
-            } else {
-              result += nodeText;
-            }
-            break;
-          case 'br':
-            result += '\n';
-            break;
-          default:
-            // 递归处理其他标签内的内容
-            result += this.processInlineElements($, $node);
-        }
+        result += this.processInlineTag($, node);
       }
     });
 
+    return result;
+  }
+
+  private processInlineTag($: any, node: any): string {
+    const $node = $(node);
+    const tagName = $node.prop('tagName')?.toLowerCase();
+    const nodeText = this.decodeHtmlEntities($node.text());
+
+    switch (tagName) {
+      case 'strong':
+      case 'b':
+        return `**${nodeText}**`;
+      case 'em':
+      case 'i':
+        return `*${nodeText}*`;
+      case 'code':
+        return `\`${nodeText}\``;
+      case 'a':
+        return this.processInlineLink($node, nodeText);
+      case 'img':
+        return this.processInlineImage($node);
+      case 'span':
+        return this.processSpanElement($, $node, nodeText);
+      case 'br':
+        return '\n';
+      default:
+        return this.processInlineElements($, $node);
+    }
+  }
+
+  private processInlineLink($node: any, nodeText: string): string {
+    const href = $node.attr('href');
+    return href ? `[${nodeText}](${href})` : nodeText;
+  }
+
+  private processInlineImage($node: any): string {
+    const src = $node.attr('src');
+    const alt = $node.attr('alt') || 'Image';
+    const title = $node.attr('title') || '';
+    const dataOriginalPath = $node.attr('data-original-path');
+
+    const imagePath = dataOriginalPath || src;
+    if (imagePath) {
+      let finalPath = src || imagePath;
+      if (!finalPath.startsWith('./') && !finalPath.startsWith('/')) {
+        finalPath = `./${finalPath}`;
+      }
+      return title ? `![${alt}](${finalPath} "${title}")` : `![${alt}](${finalPath})`;
+    }
+    return '';
+  }
+
+  private processSpanElement($: any, $node: any, nodeText: string): string {
+    const imgElement = $node.find('img');
+    if (imgElement.length > 0) {
+      return this.processSpanImages($, imgElement);
+    }
+    return nodeText;
+  }
+
+  private processSpanImages($: any, imgElement: any): string {
+    let result = '';
+    imgElement.each((j: number, img: any) => {
+      const $img = $(img);
+      const imgSrc = $img.attr('src');
+      const imgAlt = $img.attr('alt') || 'Image';
+      const imgTitle = $img.attr('title') || '';
+      const imgDataOriginalPath = $img.attr('data-original-path');
+      const imgImagePath = imgDataOriginalPath || imgSrc;
+
+      if (imgImagePath) {
+        let imgFinalPath = imgSrc || imgImagePath;
+        if (!imgFinalPath.startsWith('./') && !imgFinalPath.startsWith('/')) {
+          imgFinalPath = `./${imgFinalPath}`;
+        }
+        result += imgTitle
+          ? `![${imgAlt}](${imgFinalPath} "${imgTitle}")`
+          : `![${imgAlt}](${imgFinalPath})`;
+      }
+    });
     return result;
   }
 

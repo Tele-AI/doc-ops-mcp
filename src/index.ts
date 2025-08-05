@@ -18,6 +18,27 @@ const cheerio = require('cheerio');
 import { WEB_SCRAPING_TOOL, STRUCTURED_DATA_TOOL } from './tools/webScrapingTools';
 import { convertDocxToHtmlWithStyles } from './tools/enhancedMammothConfig';
 import { convertDocxToHtmlEnhanced } from './tools/enhancedMammothConverter';
+
+// 安全的HTML内容处理函数，防止XSS攻击
+function sanitizeHtmlForOutput(html: string): string {
+  // 对于已经包含HTML标签的内容，我们假设它是来自可信源的处理过的内容
+  // 但仍然需要确保没有恶意脚本
+  if (/<[a-z][\s\S]*>/i.test(html)) {
+    // 移除潜在的危险标签和属性
+    return html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+      .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
+      .replace(/javascript:/gi, '');
+  }
+  // 对于纯文本内容，进行HTML转义
+  return html
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
 import {
   DUAL_PARSING_TOOLS,
   dualParsingDocxToHtml,
@@ -196,6 +217,212 @@ interface QRCodeOptions {
   textColor?: string;
 }
 
+// Helper functions for readDocument
+async function processDocxWithFormatting(filePath: string, options: ReadDocumentOptions) {
+  console.error('🚀 优先使用增强型 mammoth 转换器进行样式保留转换...');
+  
+  // Try enhanced mammoth converter first
+  const enhancedResult = await tryEnhancedMammothConverter(filePath, options);
+  if (enhancedResult) {
+    return enhancedResult;
+  }
+  
+  // Fallback to basic mammoth configuration
+  return await fallbackToBasicMammoth(filePath, options);
+}
+
+async function tryEnhancedMammothConverter(filePath: string, options: ReadDocumentOptions) {
+  try {
+    console.error('🔍 尝试使用修复后的增强型 mammoth 转换器...');
+    const enhancedResult = await convertDocxToHtmlEnhanced(filePath, {
+      preserveImages: options.saveImages !== false,
+      enableExperimentalFeatures: true,
+      debug: true,
+    });
+
+    logEnhancedMammothResult(enhancedResult);
+
+    if (enhancedResult.success && (enhancedResult as any).content) {
+      const content = (enhancedResult as any).content;
+      const metadata = (enhancedResult as any).metadata;
+      
+      if (validateStylesInContent(content)) {
+        return createSuccessfulDocxResult(content, metadata, options);
+      }
+    }
+  } catch (enhancedError: any) {
+    console.error('❌ 修复后的增强型 mammoth 异常:', enhancedError.message);
+    console.error('📋 错误堆栈:', enhancedError.stack);
+  }
+  
+  return null;
+}
+
+function logEnhancedMammothResult(enhancedResult: any) {
+  console.error('📊 修复后的增强型 mammoth 结果:', {
+    success: enhancedResult.success,
+    hasContent: !!(enhancedResult as any).content,
+    contentLength: (enhancedResult as any).content?.length || 0,
+    hasStyleTags: (enhancedResult as any).content?.includes('<style>') || false,
+    hasInlineStyles: (enhancedResult as any).content?.includes('style=') || false,
+    converter: (enhancedResult as any).metadata?.converter || 'unknown',
+    stylesCount: (enhancedResult as any).metadata?.stylesCount || 0,
+    cssRulesGenerated: (enhancedResult as any).metadata?.cssRulesGenerated || 0,
+    error: (enhancedResult as any).error,
+  });
+}
+
+function validateStylesInContent(content: string): boolean {
+  const hasValidStyles = content.includes('<style>') && 
+                        content.includes('Calibri') && 
+                        content.includes('font-family');
+
+  console.error('🔍 样式验证结果:', {
+    hasStyleTags: content.includes('<style>'),
+    hasCalibriFont: content.includes('Calibri'),
+    hasFontFamily: content.includes('font-family'),
+    hasValidStyles: hasValidStyles,
+    contentLength: content.length,
+    contentPreview: content.substring(0, 500) + '...',
+  });
+
+  if (hasValidStyles) {
+    console.error('✅ 样式验证通过，返回结果');
+    return true;
+  } else {
+    console.error('⚠️ 样式验证失败，内容缺少必要的样式信息');
+    return false;
+  }
+}
+
+function createSuccessfulDocxResult(content: string, metadata: any, options: ReadDocumentOptions) {
+  return {
+    success: true,
+    content: content,
+    metadata: {
+      ...metadata,
+      format: 'html',
+      originalFormat: 'docx',
+      converter: 'enhanced-mammoth-fixed',
+      stylesPreserved: true,
+      stylesValidated: true,
+      imagesPreserved: options.saveImages !== false,
+      standalone: true,
+    },
+  };
+}
+
+async function fallbackToBasicMammoth(filePath: string, options: ReadDocumentOptions) {
+  console.error('🔄 回退到基础增强配置...');
+  console.error('🔄 使用基础 mammoth 配置作为回退方案...');
+  
+  const result = await convertDocxToHtmlWithStyles(filePath, {
+    saveImagesToFiles: true,
+    imageOutputDir: options.imageOutputDir || path.join(process.cwd(), 'output', 'images'),
+  });
+
+  console.error('🔍 回退转换结果分析:', {
+    success: result.success,
+    contentLength: result.content?.length || 0,
+    hasStyle: result.content?.includes('<style>') || false,
+    hasDoctype: result.content?.includes('<!DOCTYPE') || false,
+    contentPreview: result.content?.substring(0, 300) + '...' || 'No content',
+  });
+
+  return {
+    success: result.success,
+    content: result.content,
+    metadata: result.metadata
+      ? {
+          ...result.metadata,
+          converter: 'enhanced-mammoth',
+          fallbackUsed: true,
+          standalone: true,
+        }
+      : {
+          format: 'html',
+          originalFormat: 'docx',
+          stylesPreserved: true,
+          converter: 'enhanced-mammoth',
+          fallbackUsed: true,
+          standalone: true,
+        },
+  };
+}
+
+async function processDocxAsText(filePath: string) {
+  let result: { value: string };
+
+  try {
+    const mammoth = require('mammoth');
+    result = await mammoth.extractRawText({ path: filePath });
+  } catch (mammothError) {
+    console.error('⚠️ mammoth 文本提取失败:', mammothError);
+    throw mammothError;
+  }
+
+  return {
+    success: true,
+    content: result.value,
+    metadata: { format: 'text', originalFormat: 'docx', converter: 'mammoth' },
+  };
+}
+
+async function processDocFile(filePath: string) {
+  const extractor = new WordExtractor();
+  const extracted = await extractor.extract(filePath);
+  return {
+    success: true,
+    content: extracted.getBody(),
+    metadata: { format: 'text', originalFormat: 'doc' },
+  };
+}
+
+async function processMarkdownWithFormatting(filePath: string) {
+  console.error('🚀 使用增强型 Markdown 转换器进行样式保留转换...');
+
+  try {
+    const result = await convertMarkdownToHtml(filePath, {
+      preserveStyles: true,
+      theme: 'github', // 使用 GitHub 风格主题
+      standalone: true,
+      debug: true,
+    });
+
+    console.error('📊 Markdown 转换结果:', {
+      success: result.success,
+      contentLength: result.content?.length || 0,
+      hasStyle: result.content?.includes('<style>') || false,
+      hasDoctype: result.content?.includes('<!DOCTYPE') || false,
+    });
+
+    return {
+      success: result.success,
+      content: result.content,
+      metadata: {
+        ...result.metadata,
+        format: 'html',
+        originalFormat: 'markdown',
+        converter: 'enhanced-markdown',
+        stylesPreserved: true,
+        standalone: true,
+      },
+    };
+  } catch (markdownError: any) {
+    console.error('❌ 增强型 Markdown 转换失败:', markdownError.message);
+    throw markdownError;
+  }
+}
+
+async function processMarkdownAsText(filePath: string) {
+  const content = await fs.readFile(filePath, 'utf-8');
+  return {
+    success: true,
+    content,
+    metadata: { format: 'markdown', originalFormat: 'markdown' },
+  };
+}
+
 // Read document function
 async function readDocument(filePath: string, options: ReadDocumentOptions = {}) {
   try {
@@ -203,203 +430,54 @@ async function readDocument(filePath: string, options: ReadDocumentOptions = {})
 
     if (ext === '.docx') {
       if (options.preserveFormatting) {
-        console.error('🚀 优先使用增强型 mammoth 转换器进行样式保留转换...');
-
-        // 优先使用修复后的增强型 mammoth 转换器
-        try {
-          console.error('🔍 尝试使用修复后的增强型 mammoth 转换器...');
-          const enhancedResult = await convertDocxToHtmlEnhanced(filePath, {
-            preserveImages: options.saveImages !== false,
-            enableExperimentalFeatures: true,
-            debug: true,
-          });
-
-          console.error('📊 修复后的增强型 mammoth 结果:', {
-            success: enhancedResult.success,
-            hasContent: !!(enhancedResult as any).content,
-            contentLength: (enhancedResult as any).content?.length || 0,
-            hasStyleTags: (enhancedResult as any).content?.includes('<style>') || false,
-            hasInlineStyles: (enhancedResult as any).content?.includes('style=') || false,
-            converter: (enhancedResult as any).metadata?.converter || 'unknown',
-            stylesCount: (enhancedResult as any).metadata?.stylesCount || 0,
-            cssRulesGenerated: (enhancedResult as any).metadata?.cssRulesGenerated || 0,
-            error: (enhancedResult as any).error,
-          });
-
-          if (enhancedResult.success && (enhancedResult as any).content) {
-            console.error('✅ 修复后的增强型 mammoth 转换成功！');
-
-            const content = (enhancedResult as any).content;
-            const metadata = (enhancedResult as any).metadata;
-
-            // 验证样式是否真的被注入
-            const hasValidStyles =
-              content.includes('<style>') &&
-              content.includes('Calibri') &&
-              content.includes('font-family');
-
-            console.error('🔍 样式验证结果:', {
-              hasStyleTags: content.includes('<style>'),
-              hasCalibriFont: content.includes('Calibri'),
-              hasFontFamily: content.includes('font-family'),
-              hasValidStyles: hasValidStyles,
-              contentLength: content.length,
-              contentPreview: content.substring(0, 500) + '...',
-            });
-
-            if (hasValidStyles) {
-              console.error('✅ 样式验证通过，返回结果');
-              return {
-                success: true,
-                content: content,
-                metadata: {
-                  ...metadata,
-                  format: 'html',
-                  originalFormat: 'docx',
-                  converter: 'enhanced-mammoth-fixed',
-                  stylesPreserved: true,
-                  stylesValidated: true,
-                  imagesPreserved: options.saveImages !== false,
-                  standalone: true,
-                },
-              };
-            } else {
-              console.error('⚠️ 样式验证失败，内容缺少必要的样式信息');
-            }
-          } else {
-            console.error(
-              '⚠️ 修复后的增强型 mammoth 转换失败，错误:',
-              (enhancedResult as any).error
-            );
-          }
-        } catch (enhancedError: any) {
-          console.error('❌ 修复后的增强型 mammoth 异常:', enhancedError.message);
-          console.error('📋 错误堆栈:', enhancedError.stack);
-        }
-
-        console.error('🔄 回退到基础增强配置...');
-
-        // 回退方案：使用基础的 mammoth 配置
-        console.error('🔄 使用基础 mammoth 配置作为回退方案...');
-        const result = await convertDocxToHtmlWithStyles(filePath, {
-          saveImagesToFiles: true,
-          imageOutputDir: options.imageOutputDir || path.join(process.cwd(), 'output', 'images'),
-        });
-
-        console.error('🔍 回退转换结果分析:', {
-          success: result.success,
-          contentLength: result.content?.length || 0,
-          hasStyle: result.content?.includes('<style>') || false,
-          hasDoctype: result.content?.includes('<!DOCTYPE') || false,
-          contentPreview: result.content?.substring(0, 300) + '...' || 'No content',
-        });
-
-        return {
-          success: result.success,
-          content: result.content,
-          metadata: result.metadata
-            ? {
-                ...result.metadata,
-                converter: 'enhanced-mammoth',
-                fallbackUsed: true,
-                standalone: true,
-              }
-            : {
-                format: 'html',
-                originalFormat: 'docx',
-                stylesPreserved: true,
-                converter: 'enhanced-mammoth',
-                fallbackUsed: true,
-                standalone: true,
-              },
-        };
+        return await processDocxWithFormatting(filePath, options);
       } else {
-        // 使用 mammoth 进行纯文本提取
-        let result: { value: string };
-
-        try {
-          const mammoth = require('mammoth');
-          result = await mammoth.extractRawText({ path: filePath });
-        } catch (mammothError) {
-          console.error('⚠️ mammoth 文本提取失败:', mammothError);
-          throw mammothError;
-        }
-
-        return {
-          success: true,
-          content: result.value,
-          metadata: { format: 'text', originalFormat: 'docx', converter: 'mammoth' },
-        };
+        return await processDocxAsText(filePath);
       }
     } else if (ext === '.doc') {
-      const extractor = new WordExtractor();
-      const extracted = await extractor.extract(filePath);
-      return {
-        success: true,
-        content: extracted.getBody(),
-        metadata: { format: 'text', originalFormat: 'doc' },
-      };
+      return await processDocFile(filePath);
     } else if (ext === '.md' || ext === '.markdown') {
       if (options.preserveFormatting) {
-        console.error('🚀 使用增强型 Markdown 转换器进行样式保留转换...');
-
-        try {
-          const result = await convertMarkdownToHtml(filePath, {
-            preserveStyles: true,
-            theme: 'github', // 使用 GitHub 风格主题
-            standalone: true,
-            debug: true,
-          });
-
-          console.error('📊 Markdown 转换结果:', {
-            success: result.success,
-            hasContent: !!result.content,
-            contentLength: result.content?.length || 0,
-            hasStyleTags: result.content?.includes('<style>') || false,
-            theme: result.metadata?.theme || 'unknown',
-            headingsCount: result.metadata?.headingsCount || 0,
-            error: result.error,
-          });
-
-          if (result.success && result.content) {
-            console.error('✅ Markdown 转换成功！');
-            return {
-              success: true,
-              content: result.content,
-              metadata: {
-                ...result.metadata,
-                format: 'html',
-                originalFormat: 'markdown',
-                stylesPreserved: true,
-                standalone: true,
-              },
-            };
-          } else {
-            console.error('⚠️ Markdown 转换失败，回退到纯文本模式');
-          }
-        } catch (markdownError: any) {
-          console.error('❌ Markdown 转换异常:', markdownError.message);
-        }
+        return await processMarkdownWithFormatting(filePath);
+      } else {
+        return await processMarkdownAsText(filePath);
       }
-
-      // 回退到纯文本读取
-      const content = await fs.readFile(filePath, 'utf-8');
-      return {
-        success: true,
-        content: content,
-        metadata: { format: 'text', originalFormat: 'markdown' },
-      };
     } else {
+      // 处理其他文件类型
       const content = await fs.readFile(filePath, 'utf-8');
       return {
         success: true,
-        content: content,
+        content,
         metadata: { format: 'text', originalFormat: ext.slice(1) },
       };
     }
   } catch (error: any) {
-    return { success: false, error: error.message };
+    console.error('❌ 读取文档失败:', error.message);
+    return {
+      success: false,
+      content: '',
+      metadata: { error: error.message },
+    };
   }
+}
+
+
+
+// Helper functions for writeDocument
+function resolveFinalOutputPath(outputPath?: string): string {
+  if (!outputPath) {
+    const outputDir = defaultResourcePaths.outputDir;
+    return path.join(outputDir, `output_${Date.now()}.txt`);
+  } else if (!path.isAbsolute(outputPath)) {
+    // 如果是相对路径，基于环境变量的输出目录
+    return path.join(defaultResourcePaths.outputDir, outputPath);
+  }
+  return outputPath;
+}
+
+async function writeFileWithEncoding(finalPath: string, content: string, encoding: string) {
+  await fs.mkdir(path.dirname(finalPath), { recursive: true });
+  await fs.writeFile(finalPath, content, encoding);
 }
 
 // Write document function
@@ -409,20 +487,10 @@ async function writeDocument(
   options: WriteDocumentOptions = {}
 ) {
   try {
-    // 如果没有指定输出路径，使用环境变量控制的输出目录
-    let finalPath = outputPath;
-    if (!finalPath) {
-      const outputDir = defaultResourcePaths.outputDir;
-      finalPath = path.join(outputDir, `output_${Date.now()}.txt`);
-    } else if (!path.isAbsolute(finalPath)) {
-      // 如果是相对路径，基于环境变量的输出目录
-      finalPath = path.join(defaultResourcePaths.outputDir, finalPath);
-    }
-
+    const finalPath = resolveFinalOutputPath(outputPath);
     const encoding = options.encoding || 'utf-8';
 
-    await fs.mkdir(path.dirname(finalPath), { recursive: true });
-    await fs.writeFile(finalPath, content, encoding);
+    await writeFileWithEncoding(finalPath, content, encoding);
 
     return {
       success: true,
@@ -434,6 +502,225 @@ async function writeDocument(
   }
 }
 
+// Helper functions for convertDocument
+function resolveConvertOutputPath(inputPath: string, outputPath?: string): { finalOutputPath: string, inputExt: string, outputExt: string } {
+  const inputExt = path.extname(inputPath).toLowerCase();
+  const outputExt = outputPath ? path.extname(outputPath).toLowerCase() : '.html';
+
+  let finalOutputPath: string;
+  if (!outputPath) {
+    const baseName = path.basename(inputPath, inputExt);
+    finalOutputPath = path.join(defaultResourcePaths.outputDir, `${baseName}${outputExt}`);
+  } else if (!path.isAbsolute(outputPath)) {
+    finalOutputPath = path.join(defaultResourcePaths.outputDir, outputPath);
+  } else {
+    finalOutputPath = outputPath;
+  }
+
+  return { finalOutputPath, inputExt, outputExt };
+}
+
+async function convertHtmlToMarkdownSpecial(inputPath: string, finalOutputPath: string, options: ConvertDocumentOptions) {
+  console.error('🔄 检测到 HTML 转 Markdown 转换...');
+  console.error(`📄 输入: ${inputPath}`);
+  console.error(`📁 输出: ${finalOutputPath}`);
+
+  try {
+    const result = await convertHtmlToMarkdown(inputPath, {
+      outputPath: finalOutputPath,
+      preserveStyles: options.preserveFormatting !== false,
+      debug: true,
+    });
+
+    console.error('📊 HTML 转 Markdown 结果:', {
+      success: result.success,
+      outputPath: result.outputPath,
+      contentLength: result.content?.length || 0,
+      error: result.error,
+    });
+
+    if (result.success) {
+      return {
+        success: true,
+        outputPath: result.outputPath,
+        content: result.content,
+        metadata: {
+          ...result.metadata,
+          converter: 'html-to-markdown',
+        },
+      };
+    } else {
+      throw new Error(result.error || 'HTML 转 Markdown 失败');
+    }
+  } catch (conversionError: any) {
+    console.error('❌ HTML 转 Markdown 转换失败:', conversionError.message);
+    return {
+      success: false,
+      error: `HTML 转 Markdown 失败: ${conversionError.message}`,
+    };
+  }
+}
+
+async function convertHtmlToDocxSpecial(inputPath: string, finalOutputPath: string, options: ConvertDocumentOptions) {
+  console.error('🔄 检测到 HTML 转 DOCX 转换...');
+  console.error(`📄 输入: ${inputPath}`);
+  console.error(`📁 输出: ${finalOutputPath}`);
+
+  try {
+    const result = await convertHtmlToDocx(inputPath, finalOutputPath, {
+      preserveStyles: options.preserveFormatting !== false,
+      debug: true,
+    });
+
+    console.error('📊 HTML 转 DOCX 结果:', {
+      success: result.success,
+      outputPath: result.outputPath,
+      error: result.error,
+    });
+
+    if (result.success) {
+      return {
+        success: true,
+        outputPath: result.outputPath,
+        metadata: {
+          ...result.metadata,
+          converter: 'html-to-docx',
+        },
+      };
+    } else {
+      throw new Error(result.error || 'HTML 转 DOCX 失败');
+    }
+  } catch (conversionError: any) {
+    console.error('❌ HTML 转 DOCX 转换失败:', conversionError.message);
+    return {
+      success: false,
+      error: `HTML 转 DOCX 失败: ${conversionError.message}`,
+    };
+  }
+}
+
+async function convertDocxToMarkdownSpecial(inputPath: string, finalOutputPath: string, options: ConvertDocumentOptions) {
+  console.error('🔄 检测到 DOCX 转 Markdown 转换...');
+  console.error(`📄 输入: ${inputPath}`);
+  console.error(`📁 输出: ${finalOutputPath}`);
+
+  try {
+    const result = await convertDocxToMarkdown(inputPath, finalOutputPath, {
+      preserveFormatting: options.preserveFormatting !== false,
+    });
+
+    console.error('📊 DOCX 转 Markdown 结果:', {
+      success: result.success,
+      outputPath: result.outputPath,
+      error: result.error,
+    });
+
+    if (result.success) {
+      return {
+        success: true,
+        outputPath: result.outputPath,
+        metadata: {
+          originalFormat: 'docx',
+          targetFormat: 'markdown',
+          converter: 'docx-to-markdown',
+        },
+      };
+    } else {
+      throw new Error(result.error || 'DOCX 转 Markdown 失败');
+    }
+  } catch (conversionError: any) {
+    console.error('❌ DOCX 转 Markdown 转换失败:', conversionError.message);
+    return {
+      success: false,
+      error: `DOCX 转 Markdown 失败: ${conversionError.message}`,
+    };
+  }
+}
+
+async function convertDocxToHtmlSpecial(inputPath: string, finalOutputPath: string) {
+  console.error('🔄 检测到 DOCX 转 HTML 转换...');
+  console.error(`📄 输入: ${inputPath}`);
+  console.error(`📁 输出: ${finalOutputPath}`);
+
+  try {
+    const result = await convertDocxToHtmlEnhanced(inputPath, {
+      preserveImages: true,
+      enableExperimentalFeatures: true,
+      debug: true,
+    });
+
+    console.error('📊 DOCX 转 HTML 结果:', {
+      success: result.success,
+      hasContent: !!(result as any).content,
+      contentLength: (result as any).content?.length || 0,
+      error: (result as any).error,
+    });
+
+    if (result.success && (result as any).content) {
+      // 写入HTML文件
+      await fs.writeFile(finalOutputPath, (result as any).content, 'utf-8');
+
+      return {
+        success: true,
+        outputPath: finalOutputPath,
+        metadata: {
+          originalFormat: 'docx',
+          targetFormat: 'html',
+          converter: 'docx-to-html-enhanced',
+          stylesPreserved: true,
+        },
+      };
+    } else {
+      throw new Error((result as any).error || 'DOCX 转 HTML 失败');
+    }
+  } catch (conversionError: any) {
+    console.error('❌ DOCX 转 HTML 转换失败:', conversionError.message);
+    return {
+      success: false,
+      error: `DOCX 转 HTML 失败: ${conversionError.message}`,
+    };
+  }
+}
+
+function applyTextReplacements(content: string, textReplacements: any[]): string {
+  let processedContent = content;
+  
+  for (const replacement of textReplacements) {
+    if (replacement.useRegex) {
+      const flags = replacement.preserveCase ? 'g' : 'gi';
+      const regex = new RegExp(replacement.oldText, flags);
+      processedContent = processedContent.replace(regex, replacement.newText);
+    } else {
+      const searchValue = replacement.preserveCase
+        ? replacement.oldText
+        : new RegExp(replacement.oldText, 'gi');
+      processedContent = processedContent.replace(searchValue, replacement.newText);
+    }
+  }
+  
+  return processedContent;
+}
+
+async function performGenericConversion(inputPath: string, finalOutputPath: string, options: ConvertDocumentOptions) {
+  // Read the input document
+  const readResult = await readDocument(inputPath, {
+    preserveFormatting: options.preserveFormatting,
+  });
+  if (!readResult.success) {
+    return readResult;
+  }
+
+  let content = readResult.content;
+
+  // Apply text replacements if specified
+  if (options.textReplacements) {
+    content = applyTextReplacements(content, options.textReplacements);
+  }
+
+  // Write the converted content
+  return await writeDocument(content, finalOutputPath);
+}
+
 // Convert document function
 async function convertDocument(
   inputPath: string,
@@ -441,238 +728,44 @@ async function convertDocument(
   options: ConvertDocumentOptions = {}
 ) {
   try {
-    const inputExt = path.extname(inputPath).toLowerCase();
-    const outputExt = outputPath ? path.extname(outputPath).toLowerCase() : '.html';
+    const { finalOutputPath, inputExt, outputExt } = resolveConvertOutputPath(inputPath, outputPath);
 
-    // 使用环境变量控制的输出路径
-    let finalOutputPath = outputPath;
-    if (!finalOutputPath) {
-      const baseName = path.basename(inputPath, inputExt);
-      finalOutputPath = path.join(defaultResourcePaths.outputDir, `${baseName}${outputExt}`);
-    } else if (!path.isAbsolute(finalOutputPath)) {
-      finalOutputPath = path.join(defaultResourcePaths.outputDir, finalOutputPath);
-    }
-
-    // 特殊处理：HTML 转 Markdown
+    // Handle special conversion cases
     if (inputExt === '.html' && outputExt === '.md') {
-      console.error('🔄 检测到 HTML 转 Markdown 转换...');
-      console.error(`📄 输入: ${inputPath}`);
-      console.error(`📁 输出: ${finalOutputPath}`);
-
-      try {
-        const result = await convertHtmlToMarkdown(inputPath, {
-          outputPath: finalOutputPath,
-          preserveStyles: options.preserveFormatting !== false,
-          debug: true,
-        });
-
-        console.error('📊 HTML 转 Markdown 结果:', {
-          success: result.success,
-          outputPath: result.outputPath,
-          contentLength: result.content?.length || 0,
-          error: result.error,
-        });
-
-        if (result.success) {
-          return {
-            success: true,
-            outputPath: result.outputPath,
-            content: result.content,
-            metadata: {
-              ...result.metadata,
-              converter: 'html-to-markdown',
-            },
-          };
-        } else {
-          throw new Error(result.error || 'HTML 转 Markdown 失败');
-        }
-      } catch (conversionError: any) {
-        console.error('❌ HTML 转 Markdown 转换失败:', conversionError.message);
-        return {
-          success: false,
-          error: `HTML 转 Markdown 失败: ${conversionError.message}`,
-        };
-      }
+      return await convertHtmlToMarkdownSpecial(inputPath, finalOutputPath, options);
     }
 
-    // 特殊处理：HTML 转 DOCX
     if (inputExt === '.html' && outputExt === '.docx') {
-      console.error('🔄 检测到 HTML 转 DOCX 转换...');
-      console.error(`📄 输入: ${inputPath}`);
-      console.error(`📁 输出: ${finalOutputPath}`);
-
-      try {
-        const result = await convertHtmlToDocx(inputPath, finalOutputPath, {
-          preserveStyles: options.preserveFormatting !== false,
-          debug: true,
-        });
-
-        console.error('📊 HTML 转 DOCX 结果:', {
-          success: result.success,
-          outputPath: result.outputPath,
-          error: result.error,
-        });
-
-        if (result.success) {
-          return {
-            success: true,
-            outputPath: result.outputPath,
-            metadata: {
-              ...result.metadata,
-              converter: 'html-to-docx',
-            },
-          };
-        } else {
-          throw new Error(result.error || 'HTML 转 DOCX 失败');
-        }
-      } catch (conversionError: any) {
-        console.error('❌ HTML 转 DOCX 转换失败:', conversionError.message);
-        return {
-          success: false,
-          error: `HTML 转 DOCX 失败: ${conversionError.message}`,
-        };
-      }
+      return await convertHtmlToDocxSpecial(inputPath, finalOutputPath, options);
     }
 
-    // 特殊处理：DOCX 转 Markdown
     if (inputExt === '.docx' && outputExt === '.md') {
-      console.error('🔄 检测到 DOCX 转 Markdown 转换...');
-      console.error(`📄 输入: ${inputPath}`);
-      console.error(`📁 输出: ${finalOutputPath}`);
-
-      try {
-        const result = await convertDocxToMarkdown(inputPath, finalOutputPath, {
-          preserveFormatting: options.preserveFormatting !== false,
-        });
-
-        console.error('📊 DOCX 转 Markdown 结果:', {
-          success: result.success,
-          outputPath: result.outputPath,
-          error: result.error,
-        });
-
-        if (result.success) {
-          return {
-            success: true,
-            outputPath: result.outputPath,
-            metadata: {
-              originalFormat: 'docx',
-              targetFormat: 'markdown',
-              converter: 'docx-to-markdown',
-            },
-          };
-        } else {
-          throw new Error(result.error || 'DOCX 转 Markdown 失败');
-        }
-      } catch (conversionError: any) {
-        console.error('❌ DOCX 转 Markdown 转换失败:', conversionError.message);
-        return {
-          success: false,
-          error: `DOCX 转 Markdown 失败: ${conversionError.message}`,
-        };
-      }
+      return await convertDocxToMarkdownSpecial(inputPath, finalOutputPath, options);
     }
 
-    // 特殊处理：DOCX 转 HTML
     if (inputExt === '.docx' && outputExt === '.html') {
-      console.error('🔄 检测到 DOCX 转 HTML 转换...');
-      console.error(`📄 输入: ${inputPath}`);
-      console.error(`📁 输出: ${finalOutputPath}`);
-
-      try {
-        const result = await convertDocxToHtmlEnhanced(inputPath, {
-          preserveImages: true,
-          enableExperimentalFeatures: true,
-          debug: true,
-        });
-
-        console.error('📊 DOCX 转 HTML 结果:', {
-          success: result.success,
-          hasContent: !!(result as any).content,
-          contentLength: (result as any).content?.length || 0,
-          error: (result as any).error,
-        });
-
-        if (result.success && (result as any).content) {
-          // 写入HTML文件
-          await fs.writeFile(finalOutputPath, (result as any).content, 'utf-8');
-
-          return {
-            success: true,
-            outputPath: finalOutputPath,
-            metadata: {
-              originalFormat: 'docx',
-              targetFormat: 'html',
-              converter: 'docx-to-html-enhanced',
-              stylesPreserved: true,
-            },
-          };
-        } else {
-          throw new Error((result as any).error || 'DOCX 转 HTML 失败');
-        }
-      } catch (conversionError: any) {
-        console.error('❌ DOCX 转 HTML 转换失败:', conversionError.message);
-        return {
-          success: false,
-          error: `DOCX 转 HTML 失败: ${conversionError.message}`,
-        };
-      }
+      return await convertDocxToHtmlSpecial(inputPath, finalOutputPath);
     }
 
-    // 其他格式转换：使用原有逻辑
-    // Read the input document
-    const readResult = await readDocument(inputPath, {
-      preserveFormatting: options.preserveFormatting,
-    });
-    if (!readResult.success) {
-      return readResult;
-    }
-
-    let content = readResult.content;
-
-    // Apply text replacements if specified
-    if (options.textReplacements) {
-      for (const replacement of options.textReplacements) {
-        if (replacement.useRegex) {
-          const flags = replacement.preserveCase ? 'g' : 'gi';
-          const regex = new RegExp(replacement.oldText, flags);
-          content = content.replace(regex, replacement.newText);
-        } else {
-          const searchValue = replacement.preserveCase
-            ? replacement.oldText
-            : new RegExp(replacement.oldText, 'gi');
-          content = content.replace(searchValue, replacement.newText);
-        }
-      }
-    }
-
-    // Write the converted content
-    const writeResult = await writeDocument(content, finalOutputPath);
-    return writeResult;
+    // Handle generic conversions
+    return await performGenericConversion(inputPath, finalOutputPath, options);
   } catch (error: any) {
     return { success: false, error: error.message };
   }
 }
 
-// 重构的 DOCX to PDF 转换 - 使用优化的转换器
-async function convertDocxToPdf(inputPath: string, outputPath?: string, options: any = {}) {
-  const startTime = Date.now();
-
-  // 使用环境变量控制的输出路径
-  let finalOutputPath = outputPath;
-  if (!finalOutputPath) {
+// Helper functions for convertDocxToPdf
+function resolvePdfOutputPath(inputPath: string, outputPath?: string): string {
+  if (!outputPath) {
     const baseName = path.basename(inputPath, path.extname(inputPath));
-    finalOutputPath = path.join(defaultResourcePaths.outputDir, `${baseName}.pdf`);
-  } else if (!path.isAbsolute(finalOutputPath)) {
-    finalOutputPath = path.join(defaultResourcePaths.outputDir, finalOutputPath);
+    return path.join(defaultResourcePaths.outputDir, `${baseName}.pdf`);
+  } else if (!path.isAbsolute(outputPath)) {
+    return path.join(defaultResourcePaths.outputDir, outputPath);
   }
+  return outputPath;
+}
 
-  console.error(`🚀 开始优化的 DOCX 到 PDF 转换...`);
-  console.error(`📄 输入文件: ${inputPath}`);
-  console.error(`📁 输出路径: ${finalOutputPath}`);
-  console.error(`🌍 输出目录由环境变量控制: OUTPUT_DIR=${defaultResourcePaths.outputDir}`);
-
-  // 检查水印和二维码配置
+function checkWatermarkAndQRConfig(options: any): { hasWatermark: boolean, hasQRCode: boolean } {
   const hasWatermark =
     defaultResourcePaths.defaultWatermarkPath &&
     fsSync.existsSync(defaultResourcePaths.defaultWatermarkPath);
@@ -687,6 +780,157 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
   if (hasQRCode) {
     console.error(`📱 检测到二维码图片: ${defaultResourcePaths.defaultQrCodePath}`);
   }
+
+  return { hasWatermark, hasQRCode };
+}
+
+function logConversionStart(inputPath: string, finalOutputPath: string) {
+  console.error(`🚀 开始优化的 DOCX 到 PDF 转换...`);
+  console.error(`📄 输入文件: ${inputPath}`);
+  console.error(`📁 输出路径: ${finalOutputPath}`);
+  console.error(`🌍 输出目录由环境变量控制: OUTPUT_DIR=${defaultResourcePaths.outputDir}`);
+}
+
+function createMcpCommands(result: any, hasWatermark: boolean, hasQRCode: boolean): string[] {
+  const mcpCommands = [
+    `browser_navigate("file://${result.htmlPath}")`,
+    `browser_wait_for({ time: 3 })`,
+    `browser_pdf_save({ filename: "${result.outputPath}" })`,
+  ];
+
+  // 如果需要添加水印或二维码，添加后处理步骤
+  if (hasWatermark || hasQRCode) {
+    mcpCommands.push('# PDF后处理步骤:');
+    if (hasWatermark) {
+      mcpCommands.push(`# 自动添加水印: ${defaultResourcePaths.defaultWatermarkPath}`);
+    }
+    if (hasQRCode) {
+      mcpCommands.push(`# 添加二维码: ${defaultResourcePaths.defaultQrCodePath}`);
+    }
+  }
+
+  return mcpCommands;
+}
+
+function createPostProcessingConfig(hasWatermark: boolean, hasQRCode: boolean) {
+  return {
+    watermark: hasWatermark
+      ? {
+          enabled: true,
+          imagePath: defaultResourcePaths.defaultWatermarkPath,
+          options: {
+            scale: 0.25,
+            opacity: 0.6,
+            position: 'top-right',
+          },
+        }
+      : { enabled: false },
+    qrCode: hasQRCode
+      ? {
+          enabled: true,
+          imagePath: defaultResourcePaths.defaultQrCodePath,
+          options: {
+            scale: 0.15,
+            opacity: 1.0,
+            position: 'bottom-center',
+            addText: true,
+          },
+        }
+      : { enabled: false },
+  };
+}
+
+async function addWatermarkToPdf(outputPath: string): Promise<{ success: boolean, error?: string }> {
+  console.error(`🎨 自动添加水印...`);
+  try {
+    // @ts-ignore
+    const watermarkResult = await addWatermark(outputPath, {
+      // @ts-ignore
+      watermarkImage: defaultResourcePaths.defaultWatermarkPath,
+      watermarkImageScale: 1.0, // fullscreen模式下会自动计算尺寸
+      watermarkImageOpacity: 0.15, // 降低透明度，避免影响阅读
+      watermarkImagePosition: 'fullscreen',
+    });
+
+    if (watermarkResult.success) {
+      console.error(`✅ 水印添加成功`);
+      return { success: true };
+    } else {
+      console.error(`⚠️ 水印添加失败: ${watermarkResult.error}`);
+      return { success: false, error: watermarkResult.error };
+    }
+  } catch (watermarkError: any) {
+    console.error(`❌ 水印添加异常: ${watermarkError.message}`);
+    return { success: false, error: watermarkError.message };
+  }
+}
+
+async function addQRCodeToPdf(outputPath: string): Promise<{ success: boolean, error?: string }> {
+  console.error(`📱 添加二维码...`);
+  try {
+    // @ts-ignore
+    const qrResult = await addQRCode(outputPath, defaultQrCodePath, {
+      qrScale: 0.15,
+      qrOpacity: 1.0,
+      qrPosition: 'bottom-center',
+      addText: true,
+    });
+
+    if (qrResult.success) {
+      console.error(`✅ 二维码添加成功`);
+      return { success: true };
+    } else {
+      console.error(`⚠️ 二维码添加失败: ${qrResult.error}`);
+      return { success: false, error: qrResult.error };
+    }
+  } catch (qrError: any) {
+    console.error(`❌ 二维码添加异常: ${qrError.message}`);
+    return { success: false, error: qrError.message };
+  }
+}
+
+async function handleDirectConversionSuccess(result: any, hasWatermark: boolean, hasQRCode: boolean) {
+  let finalResult = {
+    success: true,
+    outputPath: result.outputPath,
+    stats: {
+      conversionTime: result.details.conversionTime,
+      stylesPreserved: result.details.stylesPreserved,
+      imagesPreserved: result.details.imagesPreserved,
+    },
+  };
+
+  // 自动添加水印
+  if (hasWatermark && defaultResourcePaths.defaultWatermarkPath) {
+    const watermarkResult = await addWatermarkToPdf(result.outputPath);
+    if (watermarkResult.success) {
+      (finalResult as any).watermarkAdded = true;
+    } else {
+      (finalResult as any).watermarkError = watermarkResult.error;
+    }
+  }
+
+  // 添加二维码（仅在用户明确要求时）
+  //@ts-ignore
+  if (hasQRCode && defaultQrCodePath) {
+    const qrResult = await addQRCodeToPdf(result.outputPath);
+    if (qrResult.success) {
+      (finalResult as any).qrCodeAdded = true;
+    } else {
+      (finalResult as any).qrCodeError = qrResult.error;
+    }
+  }
+
+  return finalResult;
+}
+
+// 重构的 DOCX to PDF 转换 - 使用优化的转换器
+async function convertDocxToPdf(inputPath: string, outputPath?: string, options: any = {}) {
+  const startTime = Date.now();
+  const finalOutputPath = resolvePdfOutputPath(inputPath, outputPath);
+  const { hasWatermark, hasQRCode } = checkWatermarkAndQRConfig(options);
+  
+  logConversionStart(inputPath, finalOutputPath);
 
   try {
     // 使用新的优化转换器
@@ -715,23 +959,8 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
       console.error(`  - 转换时间: ${result.details.conversionTime}ms`);
 
       if (result.requiresExternalTool) {
-        // 构建MCP命令，包含水印和二维码处理
-        const mcpCommands = [
-          `browser_navigate("file://${result.htmlPath}")`,
-          `browser_wait_for({ time: 3 })`,
-          `browser_pdf_save({ filename: "${result.outputPath}" })`,
-        ];
-
-        // 如果需要添加水印或二维码，添加后处理步骤
-        if (hasWatermark || hasQRCode) {
-          mcpCommands.push('# PDF后处理步骤:');
-          if (hasWatermark) {
-            mcpCommands.push(`# 自动添加水印: ${defaultResourcePaths.defaultWatermarkPath}`);
-          }
-          if (hasQRCode) {
-            mcpCommands.push(`# 添加二维码: ${defaultResourcePaths.defaultQrCodePath}`);
-          }
-        }
+        const mcpCommands = createMcpCommands(result, hasWatermark, hasQRCode);
+        const postProcessingConfig = createPostProcessingConfig(hasWatermark, hasQRCode);
 
         // 返回需要外部工具完成的结果
         return {
@@ -755,31 +984,7 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
           finalOutput: result.outputPath,
           instructions: result.externalToolInstructions,
           mcpCommands: mcpCommands,
-          postProcessing: {
-            watermark: hasWatermark
-              ? {
-                  enabled: true,
-                  imagePath: defaultResourcePaths.defaultWatermarkPath,
-                  options: {
-                    scale: 0.25,
-                    opacity: 0.6,
-                    position: 'top-right',
-                  },
-                }
-              : { enabled: false },
-            qrCode: hasQRCode
-              ? {
-                  enabled: true,
-                  imagePath: defaultResourcePaths.defaultQrCodePath,
-                  options: {
-                    scale: 0.15,
-                    opacity: 1.0,
-                    position: 'bottom-center',
-                    addText: true,
-                  },
-                }
-              : { enabled: false },
-          },
+          postProcessing: postProcessingConfig,
           stats: {
             conversionTime: result.details.conversionTime,
             stylesPreserved: result.details.stylesPreserved,
@@ -788,68 +993,7 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
         };
       } else {
         // 直接转换成功，需要添加水印和二维码
-        let finalResult = {
-          success: true,
-          outputPath: result.outputPath,
-          stats: {
-            conversionTime: result.details.conversionTime,
-            stylesPreserved: result.details.stylesPreserved,
-            imagesPreserved: result.details.imagesPreserved,
-          },
-        };
-
-        // 自动添加水印
-        if (hasWatermark && defaultResourcePaths.defaultWatermarkPath) {
-          console.error(`🎨 自动添加水印...`);
-          try {
-            // @ts-ignore
-            const watermarkResult = await addWatermark(result.outputPath, {
-              watermarkImage: defaultResourcePaths.defaultWatermarkPath,
-              watermarkImageScale: 1.0, // fullscreen模式下会自动计算尺寸
-              watermarkImageOpacity: 0.15, // 降低透明度，避免影响阅读
-              watermarkImagePosition: 'fullscreen',
-            });
-
-            if (watermarkResult.success) {
-              console.error(`✅ 水印添加成功`);
-              (finalResult as any).watermarkAdded = true;
-            } else {
-              console.error(`⚠️ 水印添加失败: ${watermarkResult.error}`);
-              (finalResult as any).watermarkError = watermarkResult.error;
-            }
-          } catch (watermarkError: any) {
-            console.error(`❌ 水印添加异常: ${watermarkError.message}`);
-            (finalResult as any).watermarkError = watermarkError.message;
-          }
-        }
-
-        // 添加二维码（仅在用户明确要求时）
-        //@ts-ignore
-        if (hasQRCode && defaultQrCodePath) {
-          console.error(`📱 添加二维码...`);
-          try {
-            // @ts-ignore
-            const qrResult = await addQRCode(result.outputPath, defaultQrCodePath, {
-              qrScale: 0.15,
-              qrOpacity: 1.0,
-              qrPosition: 'bottom-center',
-              addText: true,
-            });
-
-            if (qrResult.success) {
-              console.error(`✅ 二维码添加成功`);
-              (finalResult as any).qrCodeAdded = true;
-            } else {
-              console.error(`⚠️ 二维码添加失败: ${qrResult.error}`);
-              (finalResult as any).qrCodeError = qrResult.error;
-            }
-          } catch (qrError: any) {
-            console.error(`❌ 二维码添加异常: ${qrError.message}`);
-            (finalResult as any).qrCodeError = qrError.message;
-          }
-        }
-
-        return finalResult;
+        return await handleDirectConversionSuccess(result, hasWatermark, hasQRCode);
       }
     } else {
       throw new Error(result.error || '优化转换器转换失败');
@@ -862,32 +1006,25 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
   }
 }
 
-// 回退转换方法（简化的原有逻辑）
-async function fallbackConvertDocxToPdf(inputPath: string, outputPath?: string, options: any = {}) {
-  const docxPath = inputPath;
-
-  // 使用环境变量控制的输出路径
-  let finalOutputPath = outputPath;
-  if (!finalOutputPath) {
+// Helper functions for fallbackConvertDocxToPdf
+function resolveFallbackOutputPath(inputPath: string, outputPath?: string): string {
+  if (!outputPath) {
     const baseName = path.basename(inputPath, path.extname(inputPath));
-    finalOutputPath = path.join(defaultResourcePaths.outputDir, `${baseName}.pdf`);
-  } else if (!path.isAbsolute(finalOutputPath)) {
-    finalOutputPath = path.join(defaultResourcePaths.outputDir, finalOutputPath);
+    return path.join(defaultResourcePaths.outputDir, `${baseName}.pdf`);
+  } else if (!path.isAbsolute(outputPath)) {
+    return path.join(defaultResourcePaths.outputDir, outputPath);
   }
+  return outputPath;
+}
 
+function logFallbackConversionStart(docxPath: string, finalOutputPath: string) {
   console.error(`🔄 使用回退方案进行 DOCX 到 PDF 转换...`);
   console.error(`📄 输入: ${docxPath}`);
   console.error(`📁 输出: ${finalOutputPath}`);
   console.error(`🌍 输出目录由环境变量控制: OUTPUT_DIR=${defaultResourcePaths.outputDir}`);
+}
 
-  // Ensure output directory exists
-  await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
-
-  let perfectWordHtml = '';
-  let conversionSuccess = false;
-  let tempHtmlPath = '';
-
-  // 尝试使用双重解析引擎
+async function tryDualParsingEngine(docxPath: string): Promise<{ success: boolean, content?: string }> {
   try {
     console.error('🚀 尝试双重解析引擎...');
     const dualResult = await dualParsingDocxToHtml({
@@ -901,41 +1038,69 @@ async function fallbackConvertDocxToPdf(inputPath: string, outputPath?: string, 
     });
 
     if (dualResult.success && dualResult.content) {
-      perfectWordHtml = dualResult.content;
-      conversionSuccess = true;
       console.error('✅ 双重解析引擎转换成功！');
+      return { success: true, content: dualResult.content };
     }
+    return { success: false };
   } catch (dualError: any) {
     console.error('❌ 双重解析引擎失败:', dualError.message);
+    return { success: false };
   }
+}
 
-  // 如果双重解析失败，使用增强型 mammoth
-  if (!conversionSuccess) {
-    try {
-      console.error('🔄 使用增强型 mammoth 转换器...');
-      const enhancedResult = await convertDocxToHtmlEnhanced(docxPath, {
-        preserveImages: true,
-        enableExperimentalFeatures: true,
-        debug: true,
-      });
+async function tryEnhancedMammoth(docxPath: string): Promise<{ success: boolean, content?: string }> {
+  try {
+    console.error('🔄 使用增强型 mammoth 转换器...');
+    const enhancedResult = await convertDocxToHtmlEnhanced(docxPath, {
+      preserveImages: true,
+      enableExperimentalFeatures: true,
+      debug: true,
+    });
 
-      if (enhancedResult.success && (enhancedResult as any).content) {
-        perfectWordHtml = (enhancedResult as any).content;
-        conversionSuccess = true;
-        console.error('✅ 增强型 mammoth 转换成功！');
-      }
-    } catch (enhancedError: any) {
-      console.error('❌ 增强型 mammoth 失败:', enhancedError.message);
+    if (enhancedResult.success && (enhancedResult as any).content) {
+      console.error('✅ 增强型 mammoth 转换成功！');
+      return { success: true, content: (enhancedResult as any).content };
     }
+    return { success: false };
+  } catch (enhancedError: any) {
+    console.error('❌ 增强型 mammoth 失败:', enhancedError.message);
+    return { success: false };
   }
+}
 
-  // 最终回退
-  if (!conversionSuccess) {
-    console.error('🔄 使用最终回退方案...');
-    const mammoth = require('mammoth');
-    const basicResult = await mammoth.convertToHtml({ path: docxPath });
-    perfectWordHtml = createPerfectWordHtml(basicResult.value, options);
-    conversionSuccess = true;
+async function useBasicMammothFallback(docxPath: string, options: any): Promise<string> {
+  console.error('🔄 使用最终回退方案...');
+  const mammoth = require('mammoth');
+  const basicResult = await mammoth.convertToHtml({ path: docxPath });
+  return createPerfectWordHtml(basicResult.value, options);
+}
+
+// 回退转换方法（简化的原有逻辑）
+async function fallbackConvertDocxToPdf(inputPath: string, outputPath?: string, options: any = {}) {
+  const docxPath = inputPath;
+  const finalOutputPath = resolveFallbackOutputPath(inputPath, outputPath);
+  
+  logFallbackConversionStart(docxPath, finalOutputPath);
+
+  // Ensure output directory exists
+  await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
+
+  let perfectWordHtml = '';
+  let tempHtmlPath = '';
+
+  // 尝试使用双重解析引擎
+  const dualResult = await tryDualParsingEngine(docxPath);
+  if (dualResult.success && dualResult.content) {
+    perfectWordHtml = dualResult.content;
+  } else {
+    // 如果双重解析失败，使用增强型 mammoth
+    const enhancedResult = await tryEnhancedMammoth(docxPath);
+    if (enhancedResult.success && enhancedResult.content) {
+      perfectWordHtml = enhancedResult.content;
+    } else {
+      // 最终回退
+      perfectWordHtml = await useBasicMammothFallback(docxPath, options);
+    }
   }
 
   console.error(`🎨 HTML 生成完成 (长度: ${perfectWordHtml.length})`);
@@ -947,7 +1112,7 @@ async function fallbackConvertDocxToPdf(inputPath: string, outputPath?: string, 
   if (!finalHtml.includes('<style>')) {
     console.error('⚠️ 检测到样式缺失，强制注入Word样式...');
 
-    // 提取现有内容并包装完整的HTML结构
+    // 安全地提取现有内容并包装完整的HTML结构
     const contentWithoutWrapper = finalHtml
       .replace(/<!DOCTYPE[^>]*>/gi, '')
       .replace(/<html[^>]*>/gi, '')
@@ -956,11 +1121,25 @@ async function fallbackConvertDocxToPdf(inputPath: string, outputPath?: string, 
       .replace(/<body[^>]*>/gi, '')
       .replace(/<\/body>/gi, '');
 
-    finalHtml = createPerfectWordHtml(contentWithoutWrapper, options);
+    // 使用安全的HTML处理函数
+    const safeContent = sanitizeHtmlForOutput(contentWithoutWrapper);
+    finalHtml = createPerfectWordHtml(safeContent, options);
   }
+
+  // 使用全局的安全HTML处理函数
 
   // 确保DOCTYPE和完整的HTML结构
   if (!finalHtml.includes('<!DOCTYPE')) {
+    const cleanedContent = finalHtml
+      .replace(/<!DOCTYPE[^>]*>/gi, '')
+      .replace(/<html[^>]*>/gi, '')
+      .replace(/<\/html>/gi, '')
+      .replace(/<head[^>]*>.*?<\/head>/gi, '')
+      .replace(/<body[^>]*>/gi, '')
+      .replace(/<\/body>/gi, '');
+    
+    const safeContent = sanitizeHtmlForOutput(cleanedContent);
+    
     finalHtml = `<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -970,13 +1149,7 @@ async function fallbackConvertDocxToPdf(inputPath: string, outputPath?: string, 
     ${finalHtml.includes('<style>') ? '' : createPerfectWordHtml('', options).match(/<style[^>]*>[\s\S]*?<\/style>/gi)?.[0] || ''}
 </head>
 <body>
-${finalHtml
-  .replace(/<!DOCTYPE[^>]*>/gi, '')
-  .replace(/<html[^>]*>/gi, '')
-  .replace(/<\/html>/gi, '')
-  .replace(/<head[^>]*>.*?<\/head>/gi, '')
-  .replace(/<body[^>]*>/gi, '')
-  .replace(/<\/body>/gi, '')}
+${safeContent}
 </body>
 </html>`;
   }
@@ -1711,6 +1884,9 @@ function createPerfectWordHtml(content: string, options: any = {}): string {
     }
   `;
 
+  // 使用全局的安全HTML处理函数
+  const safeContent = sanitizeHtmlForOutput(content);
+
   // 生成完整的HTML文档，确保包含所有必要的元素和样式
   return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -1722,7 +1898,7 @@ function createPerfectWordHtml(content: string, options: any = {}): string {
   <style>${ultimateWordStyles}</style>
 </head>
 <body>
-  ${content}
+  ${safeContent}
 </body>
 </html>`;
 }
@@ -1836,6 +2012,44 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
   }
 }
 
+// Helper function for QR code position calculation
+function calculateQRPosition(position: string, width: number, height: number, qrWidth: number, qrHeight: number): { x: number, y: number } {
+  let x = 0, y = 0;
+
+  switch (position) {
+    case 'top-left':
+      x = 20;
+      y = height - qrHeight - 20;
+      break;
+    case 'top-right':
+      x = width - qrWidth - 20;
+      y = height - qrHeight - 20;
+      break;
+    case 'top-center':
+      x = (width - qrWidth) / 2;
+      y = height - qrHeight - 20;
+      break;
+    case 'bottom-left':
+      x = 20;
+      y = 20;
+      break;
+    case 'bottom-right':
+      x = width - qrWidth - 20;
+      y = 20;
+      break;
+    case 'bottom-center':
+      x = (width - qrWidth) / 2;
+      y = 20;
+      break;
+    case 'center':
+      x = (width - qrWidth) / 2;
+      y = (height - qrHeight) / 2;
+      break;
+  }
+
+  return { x, y };
+}
+
 // QR Code function
 async function addQRCode(pdfPath: string, qrCodePath?: string, options: QRCodeOptions = {}) {
   try {
@@ -1861,45 +2075,15 @@ async function addQRCode(pdfPath: string, qrCodePath?: string, options: QRCodeOp
       const opacity = options.qrOpacity || 1.0;
       const position = options.qrPosition || 'bottom-center';
 
-      let x = 0,
-        y = 0;
-
-      switch (position) {
-        case 'top-left':
-          x = 20;
-          y = height - qrImage.height * scale - 20;
-          break;
-        case 'top-right':
-          x = width - qrImage.width * scale - 20;
-          y = height - qrImage.height * scale - 20;
-          break;
-        case 'top-center':
-          x = (width - qrImage.width * scale) / 2;
-          y = height - qrImage.height * scale - 20;
-          break;
-        case 'bottom-left':
-          x = 20;
-          y = 20;
-          break;
-        case 'bottom-right':
-          x = width - qrImage.width * scale - 20;
-          y = 20;
-          break;
-        case 'bottom-center':
-          x = (width - qrImage.width * scale) / 2;
-          y = 20;
-          break;
-        case 'center':
-          x = (width - qrImage.width * scale) / 2;
-          y = (height - qrImage.height * scale) / 2;
-          break;
-      }
+      const qrWidth = qrImage.width * scale;
+      const qrHeight = qrImage.height * scale;
+      const { x, y } = calculateQRPosition(position, width, height, qrWidth, qrHeight);
 
       page.drawImage(qrImage, {
         x,
         y,
-        width: qrImage.width * scale,
-        height: qrImage.height * scale,
+        width: qrWidth,
+        height: qrHeight,
         opacity,
       });
 
@@ -1910,7 +2094,7 @@ async function addQRCode(pdfPath: string, qrCodePath?: string, options: QRCodeOp
         const textColor = options.textColor || '#000000';
 
         page.drawText(text, {
-          x: x + (qrImage.width * scale - text.length * textSize * 0.6) / 2,
+          x: x + (qrWidth - text.length * textSize * 0.6) / 2,
           y: y - 15,
           size: textSize,
           font,
@@ -1931,6 +2115,85 @@ async function addQRCode(pdfPath: string, qrCodePath?: string, options: QRCodeOp
   }
 }
 
+// Helper functions for processPdfPostConversion
+function resolvePostProcessingPath(playwrightPdfPath: string, targetPath?: string): string {
+  const outputDir = process.env.OUTPUT_DIR || path.dirname(playwrightPdfPath);
+  
+  if (!targetPath) {
+    // Extract original filename from playwright path
+    const playwrightFileName = path.basename(playwrightPdfPath);
+    // Remove timestamp prefix and decode the filename
+    const decodedName = playwrightFileName
+      .replace(/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z-/, '')
+      .replace(/-/g, '/');
+    
+    // Sanitize the decoded name to prevent path traversal attacks
+    const sanitizedName = path.basename(decodedName).replace(/[^a-zA-Z0-9._-]/g, '_');
+    return path.join(outputDir, sanitizedName);
+  } else if (!path.isAbsolute(targetPath)) {
+    // Sanitize relative paths to prevent directory traversal
+    const sanitizedPath = targetPath.replace(/\.\./g, '').replace(/[\/\\]+/g, path.sep);
+    return path.join(outputDir, path.basename(sanitizedPath));
+  }
+
+  // For absolute paths, ensure they don't escape the output directory
+  const resolvedTarget = path.resolve(targetPath);
+  const resolvedOutput = path.resolve(outputDir);
+  if (!resolvedTarget.startsWith(resolvedOutput)) {
+    throw new Error('Invalid target path: path traversal detected');
+  }
+  return resolvedTarget;
+}
+
+async function processWatermarkAddition(finalPath: string, options: any): Promise<any> {
+  if (!(options.addWatermark || process.env.WATERMARK_IMAGE)) {
+    return null;
+  }
+
+  const watermarkOptions = {
+    watermarkImage: options.watermarkImage || process.env.WATERMARK_IMAGE,
+    watermarkText: options.watermarkText,
+    watermarkImageScale: options.watermarkImageScale || 0.25,
+    watermarkImageOpacity: options.watermarkImageOpacity || 0.6,
+    watermarkImagePosition: options.watermarkImagePosition || 'top-right',
+    watermarkFontSize: options.watermarkFontSize || 48,
+    watermarkTextOpacity: options.watermarkTextOpacity || 0.3,
+  };
+
+  try {
+    return await addWatermark(finalPath, watermarkOptions);
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+async function processQRCodeAddition(finalPath: string, options: any): Promise<any> {
+  if (!(options.addQrCode || (options.addQrCode !== false && process.env.QR_CODE_IMAGE))) {
+    return null;
+  }
+
+  const qrOptions = {
+    qrScale: options.qrScale || 0.15,
+    qrOpacity: options.qrOpacity || 1.0,
+    qrPosition: options.qrPosition || 'bottom-center',
+    addText: options.addText !== false,
+    customText: options.customText || 'Scan QR code for more information',
+    textSize: options.textSize || 8,
+    textColor: options.textColor || '#000000',
+  };
+
+  try {
+    const qrCodePath = options.qrCodePath || process.env.QR_CODE_IMAGE;
+    if (qrCodePath) {
+      return await addQRCode(finalPath, qrCodePath, qrOptions);
+    } else {
+      return { success: false, error: 'QR code path not provided' };
+    }
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
 // Unified PDF post-processing function
 async function processPdfPostConversion(
   playwrightPdfPath: string,
@@ -1938,21 +2201,7 @@ async function processPdfPostConversion(
   options: any = {}
 ) {
   try {
-    // Convert playwright-mcp temp path to target path
-    const outputDir = process.env.OUTPUT_DIR || path.dirname(playwrightPdfPath);
-    let finalPath = targetPath;
-
-    if (!finalPath) {
-      // Extract original filename from playwright path
-      const playwrightFileName = path.basename(playwrightPdfPath);
-      // Remove timestamp prefix and decode the filename
-      const decodedName = playwrightFileName
-        .replace(/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}\.\d{3}Z-/, '')
-        .replace(/-/g, '/');
-      finalPath = path.join(outputDir, path.basename(decodedName));
-    } else if (!path.isAbsolute(finalPath)) {
-      finalPath = path.join(outputDir, finalPath);
-    }
+    const finalPath = resolvePostProcessingPath(playwrightPdfPath, targetPath);
 
     // Ensure output directory exists
     await fs.mkdir(path.dirname(finalPath), { recursive: true });
@@ -1963,51 +2212,15 @@ async function processPdfPostConversion(
     const results: any[] = [];
 
     // Add watermark if specified
-    if (finalPath && (options.addWatermark || process.env.WATERMARK_IMAGE)) {
-      const watermarkOptions = {
-        watermarkImage: options.watermarkImage || process.env.WATERMARK_IMAGE,
-        watermarkText: options.watermarkText,
-        watermarkImageScale: options.watermarkImageScale || 0.25,
-        watermarkImageOpacity: options.watermarkImageOpacity || 0.6,
-        watermarkImagePosition: options.watermarkImagePosition || 'top-right',
-        watermarkFontSize: options.watermarkFontSize || 48,
-        watermarkTextOpacity: options.watermarkTextOpacity || 0.3,
-      };
-
-      try {
-        const watermarkResult = await addWatermark(finalPath, watermarkOptions);
-        results.push(watermarkResult);
-      } catch (error: any) {
-        results.push({ success: false, error: error.message });
-      }
+    const watermarkResult = await processWatermarkAddition(finalPath, options);
+    if (watermarkResult) {
+      results.push(watermarkResult);
     }
 
     // Add QR code if specified
-    if (
-      finalPath &&
-      (options.addQrCode || (options.addQrCode !== false && process.env.QR_CODE_IMAGE))
-    ) {
-      const qrOptions = {
-        qrScale: options.qrScale || 0.15,
-        qrOpacity: options.qrOpacity || 1.0,
-        qrPosition: options.qrPosition || 'bottom-center',
-        addText: options.addText !== false,
-        customText: options.customText || 'Scan QR code for more information',
-        textSize: options.textSize || 8,
-        textColor: options.textColor || '#000000',
-      };
-
-      try {
-        const qrCodePath = options.qrCodePath || process.env.QR_CODE_IMAGE;
-        if (qrCodePath) {
-          const qrResult = await addQRCode(finalPath, qrCodePath, qrOptions);
-          results.push(qrResult);
-        } else {
-          results.push({ success: false, error: 'QR code path not provided' });
-        }
-      } catch (error: any) {
-        results.push({ success: false, error: error.message });
-      }
+    const qrResult = await processQRCodeAddition(finalPath, options);
+    if (qrResult) {
+      results.push(qrResult);
     }
 
     // Clean up temporary playwright file if it's different from final path
@@ -2037,23 +2250,53 @@ async function processPdfPostConversion(
   }
 }
 
+// Helper functions for convertMarkdownToPdf
+function resolveMarkdownPdfOutputPath(inputPath: string, outputPath?: string): string {
+  if (!outputPath) {
+    const baseName = path.basename(inputPath, path.extname(inputPath));
+    return path.join(defaultResourcePaths.outputDir, `${baseName}.pdf`);
+  } else if (!path.isAbsolute(outputPath)) {
+    return path.join(defaultResourcePaths.outputDir, outputPath);
+  }
+  return outputPath;
+}
+
+function logMarkdownConversionStart(inputPath: string, outputPath: string): void {
+  console.error(`🔄 Markdown 到 PDF 转换...`);
+  console.error(`📄 输入: ${inputPath}`);
+  console.error(`📁 输出: ${outputPath}`);
+}
+
+function createMarkdownPlaywrightCommands(htmlOutputPath: string, finalOutputPath: string): string[] {
+  return [
+    `browser_navigate("file://${htmlOutputPath}")`,
+    `browser_wait_for({ time: 3 })`,
+    `browser_pdf_save({ filename: "${finalOutputPath}" })`,
+  ];
+}
+
+function createMarkdownPostProcessingSteps(options: any): string[] {
+  const postProcessingSteps: string[] = [];
+  const defaultWatermarkPath = process.env.WATERMARK_IMAGE || null;
+  const defaultQrCodePath = process.env.QR_CODE_IMAGE || null;
+  const addQrCode = options.addQrCode || false;
+
+  if (defaultWatermarkPath) {
+    postProcessingSteps.push(`添加水印: ${defaultWatermarkPath}`);
+  }
+  if (addQrCode && defaultQrCodePath) {
+    postProcessingSteps.push(`添加二维码: ${defaultQrCodePath}`);
+  }
+  return postProcessingSteps;
+}
+
 // Markdown 转 PDF 函数
 // 注意：此函数实际上是先将 Markdown 转换为 HTML，然后需要使用 playwright-mcp 完成最终的 PDF 转换
 // 转换流程：Markdown → HTML → PDF (通过 playwright-mcp)
 async function convertMarkdownToPdf(inputPath: string, outputPath?: string, options: any = {}) {
   try {
-    // 使用环境变量控制的输出路径
-    let finalOutputPath = outputPath;
-    if (!finalOutputPath) {
-      const baseName = path.basename(inputPath, path.extname(inputPath));
-      finalOutputPath = path.join(defaultResourcePaths.outputDir, `${baseName}.pdf`);
-    } else if (!path.isAbsolute(finalOutputPath)) {
-      finalOutputPath = path.join(defaultResourcePaths.outputDir, finalOutputPath);
-    }
-
-    console.error(`🔄 Markdown 到 PDF 转换...`);
-    console.error(`📄 输入: ${inputPath}`);
-    console.error(`📁 输出: ${finalOutputPath}`);
+    const finalOutputPath = resolveMarkdownPdfOutputPath(inputPath, outputPath);
+    logMarkdownConversionStart(inputPath, finalOutputPath);
 
     // 确保输出目录存在
     await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
@@ -2079,20 +2322,10 @@ async function convertMarkdownToPdf(inputPath: string, outputPath?: string, opti
     const addQrCode = options.addQrCode || false;
 
     // 构建 playwright 命令，包含水印和二维码处理
-    const playwrightCommands = [
-      `browser_navigate("file://${htmlOutputPath}")`,
-      `browser_wait_for({ time: 3 })`,
-      `browser_pdf_save({ filename: "${finalOutputPath}" })`,
-    ];
+    const playwrightCommands = createMarkdownPlaywrightCommands(htmlOutputPath, finalOutputPath);
 
     // 如果有水印或二维码需要添加，在 playwright 命令后添加处理步骤
-    const postProcessingSteps: string[] = [];
-    if (defaultWatermarkPath) {
-      postProcessingSteps.push(`添加水印: ${defaultWatermarkPath}`);
-    }
-    if (addQrCode && defaultQrCodePath) {
-      postProcessingSteps.push(`添加二维码: ${defaultQrCodePath}`);
-    }
+    const postProcessingSteps = createMarkdownPostProcessingSteps(options);
 
     return {
       success: true,
@@ -2118,21 +2351,28 @@ async function convertMarkdownToPdf(inputPath: string, outputPath?: string, opti
   }
 }
 
+// Helper functions for convertDocxToMarkdown
+function resolveDocxToMarkdownOutputPath(inputPath: string, outputPath?: string): string {
+  if (!outputPath) {
+    const baseName = path.basename(inputPath, path.extname(inputPath));
+    return path.join(defaultResourcePaths.outputDir, `${baseName}.md`);
+  } else if (!path.isAbsolute(outputPath)) {
+    return path.join(defaultResourcePaths.outputDir, outputPath);
+  }
+  return outputPath;
+}
+
+function logDocxToMarkdownConversionStart(inputPath: string, outputPath: string): void {
+  console.error(`🔄 DOCX 到 Markdown 转换...`);
+  console.error(`📄 输入: ${inputPath}`);
+  console.error(`📁 输出: ${outputPath}`);
+}
+
 // DOCX 转 Markdown 函数
 async function convertDocxToMarkdown(inputPath: string, outputPath?: string, options: any = {}) {
   try {
-    // 使用环境变量控制的输出路径
-    let finalOutputPath = outputPath;
-    if (!finalOutputPath) {
-      const baseName = path.basename(inputPath, path.extname(inputPath));
-      finalOutputPath = path.join(defaultResourcePaths.outputDir, `${baseName}.md`);
-    } else if (!path.isAbsolute(finalOutputPath)) {
-      finalOutputPath = path.join(defaultResourcePaths.outputDir, finalOutputPath);
-    }
-
-    console.error(`🔄 DOCX 到 Markdown 转换...`);
-    console.error(`📄 输入: ${inputPath}`);
-    console.error(`📁 输出: ${finalOutputPath}`);
+    const finalOutputPath = resolveDocxToMarkdownOutputPath(inputPath, outputPath);
+    logDocxToMarkdownConversionStart(inputPath, finalOutputPath);
 
     // 确保输出目录存在
     await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
@@ -2162,21 +2402,28 @@ async function convertDocxToMarkdown(inputPath: string, outputPath?: string, opt
   }
 }
 
+// Helper functions for convertDocxToTxt
+function resolveDocxToTxtOutputPath(inputPath: string, outputPath?: string): string {
+  if (!outputPath) {
+    const baseName = path.basename(inputPath, path.extname(inputPath));
+    return path.join(defaultResourcePaths.outputDir, `${baseName}.txt`);
+  } else if (!path.isAbsolute(outputPath)) {
+    return path.join(defaultResourcePaths.outputDir, outputPath);
+  }
+  return outputPath;
+}
+
+function logDocxToTxtConversionStart(inputPath: string, outputPath: string): void {
+  console.error(`🔄 DOCX 到 TXT 转换...`);
+  console.error(`📄 输入: ${inputPath}`);
+  console.error(`📁 输出: ${outputPath}`);
+}
+
 // DOCX 转 TXT 函数
 async function convertDocxToTxt(inputPath: string, outputPath?: string, options: any = {}) {
   try {
-    // 使用环境变量控制的输出路径
-    let finalOutputPath = outputPath;
-    if (!finalOutputPath) {
-      const baseName = path.basename(inputPath, path.extname(inputPath));
-      finalOutputPath = path.join(defaultResourcePaths.outputDir, `${baseName}.txt`);
-    } else if (!path.isAbsolute(finalOutputPath)) {
-      finalOutputPath = path.join(defaultResourcePaths.outputDir, finalOutputPath);
-    }
-
-    console.error(`🔄 DOCX 到 TXT 转换...`);
-    console.error(`📄 输入: ${inputPath}`);
-    console.error(`📁 输出: ${finalOutputPath}`);
+    const finalOutputPath = resolveDocxToTxtOutputPath(inputPath, outputPath);
+    logDocxToTxtConversionStart(inputPath, finalOutputPath);
 
     // 确保输出目录存在
     await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
