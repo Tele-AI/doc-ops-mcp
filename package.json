@@ -47,7 +47,7 @@
     "jszip": "^3.10.1",
     "linkedom": "^0.18.11",
     "mammoth": "^1.6.0",
-    "marked": "^15.0.12",
+    "marked": "^16.1.2",
     "node-pandoc": "^0.3.0",
     "pdf-lib": "^1.17.1",
     "pdf2pic": "^3.1.3",
