@@ -1,6 +1,7 @@
 // doc-ops-mcp - Document Operations MCP Server
 // Enhanced DOCX to PDF conversion with perfect Word style replication
 
+import { SafeErrorHandler } from './security/errorHandler';
 const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
 const fsSync = require('fs');
 const os = require('os');
@@ -446,11 +447,14 @@ async function readDocument(filePath: string, options: ReadDocumentOptions = {})
       };
     }
   } catch (error: any) {
-    console.error('❌ 读取文档失败:', error.message);
+    // 不再直接输出错误消息
+    SafeErrorHandler.logError('读取文档失败', error);
     return {
       success: false,
       content: '',
-      metadata: { error: error.message },
+      metadata: { 
+        error: SafeErrorHandler.sanitizeErrorMessage(error) 
+      },
     };
   }
 }

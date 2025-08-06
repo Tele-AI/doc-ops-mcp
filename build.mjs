@@ -2,42 +2,38 @@
 
 import { build } from 'esbuild';
 import { wasmLoader } from 'esbuild-plugin-wasm';
-import { readFileSync, mkdirSync, existsSync, statSync } from 'fs';
+import { promises as fs } from 'fs';  // 使用异步 fs
 import { resolve } from 'path';
 
-// Safely read and parse package.json with size limit
+// 异步读取和解析 package.json
 let pkg;
 try {
   const packagePath = './package.json';
-  const stats = statSync(packagePath);
+  const stats = await fs.stat(packagePath);  // 改为异步
   
-  // Limit package.json size to 1MB to prevent DoS
+  // 限制文件大小防止 DoS
   if (stats.size > 1024 * 1024) {
     throw new Error('package.json file is too large');
   }
   
-  const packageContent = readFileSync(packagePath, 'utf8');
+  const packageContent = await fs.readFile(packagePath, 'utf8');  // 改为异步
   pkg = JSON.parse(packageContent);
 } catch (error) {
-  // 生产环境移除调试输出
   process.exit(1);
 }
 
-// Safely ensure dist directory exists
+// 异步确保 dist 目录存在
 try {
   const distPath = resolve('./dist');
   
-  // Validate the path to prevent directory traversal
+  // 验证路径安全性
   if (!distPath.startsWith(resolve('./'))) {
     throw new Error('Invalid directory path');
   }
   
-  if (!existsSync(distPath)) {
-    // Create directory without deep recursion to prevent DoS
-    mkdirSync(distPath, { recursive: false });
-  }
+  // 使用异步操作，支持递归创建
+  await fs.mkdir(distPath, { recursive: true });  // 改为异步且 recursive: true
 } catch (error) {
-  // 生产环境移除调试输出
   process.exit(1);
 }
 

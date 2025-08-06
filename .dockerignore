@@ -1,3 +1,10 @@
+# Development files
+.env
+.env.*
+*.key
+*.pem
+*.crt
+
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -8,13 +15,6 @@ pnpm-debug.log*
 # Build outputs
 dist/
 build/
-
-# Development files
-.env
-.env.local
-.env.development.local
-.env.test.local
-.env.production.local
 
 # IDE files
 .vscode/

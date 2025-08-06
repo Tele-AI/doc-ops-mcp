@@ -4,6 +4,7 @@
  * 转换路径：DOCX -> 样式完整的 HTML/MD -> PDF
  */
 
+import { SafeErrorHandler } from '../security/errorHandler';
 import { DualParsingEngine, DualParsingOptions, DualParsingResult } from './dualParsingEngine';
 import { dualParsingDocxToHtml } from './dualParsingDocxTools';
 const fs = require('fs/promises');
@@ -147,10 +148,10 @@ export class OptimizedDocxConverter {
           throw new Error(`不支持的输出格式: ${targetFormat}`);
       }
     } catch (error: any) {
-      console.error('❌ 转换失败:', error.message);
+      SafeErrorHandler.logError('转换失败', error);
       return {
         success: false,
-        error: error.message,
+        error: SafeErrorHandler.sanitizeErrorMessage(error),
         details: {
           originalFormat: 'docx',
           targetFormat: options.outputFormat || 'html',
@@ -224,10 +225,10 @@ export class OptimizedDocxConverter {
         dualParsingResult: result,
       };
     } catch (error: any) {
-      console.error('❌ HTML 转换失败:', error.message);
+      SafeErrorHandler.logError('HTML 转换失败', error);
       return {
         success: false,
-        error: error.message,
+        error: SafeErrorHandler.sanitizeErrorMessage(error),
       };
     }
   }
@@ -303,13 +304,13 @@ export class OptimizedDocxConverter {
         },
       };
     } catch (error: any) {
-      console.error('❌ Markdown 转换失败:', error.message);
+      SafeErrorHandler.logError('PDF 转换准备失败', error);
       return {
         success: false,
-        error: error.message,
+        error: SafeErrorHandler.sanitizeErrorMessage(error),
         details: {
           originalFormat: 'docx',
-          targetFormat: 'markdown',
+          targetFormat: 'pdf',
           stylesPreserved: false,
           imagesPreserved: false,
           conversionTime: Date.now() - startTime,
