@@ -9,6 +9,19 @@ const path = require('path');
 const fs = require('fs/promises');
 import { StyleExtractor, StyleDefinition, DocumentStyle } from './styleExtractor';
 
+// 路径安全验证函数
+function validatePath(inputPath: string): string {
+  const resolvedPath = path.resolve(inputPath);
+  const normalizedPath = path.normalize(resolvedPath);
+  
+  // 检查路径遍历攻击
+  if (normalizedPath.includes('..') || normalizedPath !== resolvedPath) {
+    throw new Error('Invalid path: Path traversal detected');
+  }
+  
+  return normalizedPath;
+}
+
 interface MammothEnhancerOptions {
   preserveImages?: boolean;
   imageOutputDir?: string;
@@ -253,7 +266,7 @@ export class MammothEnhancer {
           };
         } else if (options.imageOutputDir) {
           // 保存到文件并使用相对路径
-          const imagePath = path.join(options.imageOutputDir, imageName);
+          const imagePath = validatePath(path.join(options.imageOutputDir, imageName));
           this.saveImageToFile(imagePath, imageBuffer);
 
           // 使用相对路径或缓存路径标识符
@@ -353,6 +366,18 @@ export class MammothEnhancer {
   }
 
   /**
+   * HTML转义函数
+   */
+  private escapeHtml(unsafe: string): string {
+    return unsafe
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
+  /**
    * 修复表格格式
    */
   private fixTableFormatting(html: string): string {
@@ -365,7 +390,7 @@ export class MammothEnhancer {
           content = `<tbody>${rows.join('')}</tbody>`;
         }
       }
-      return `<table${attrs}>${content}</table>`;
+      return `<table${this.escapeHtml(attrs)}>${content}</table>`;
     });
   }
 
@@ -376,8 +401,8 @@ export class MammothEnhancer {
     // 将连续的列表项包装在 ul 或 ol 中
     let processedHtml = html;
 
-    // 查找连续的 li 元素并包装
-    processedHtml = processedHtml.replace(/(<li[^>]*>[\s\S]*?<\/li>\s*)+/g, match => {
+    // 查找连续的 li 元素并包装 - 修复ReDoS风险
+    processedHtml = processedHtml.replace(/(<li[^>]*>[\s\S]{0,5000}?<\/li>\s*)+/g, match => {
       // 检查是否已经在列表中
       if (match.includes('<ul>') || match.includes('<ol>')) {
         return match;

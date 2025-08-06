@@ -42,6 +42,28 @@ class EnhancedHtmlToDocxConverter {
     this.initializeStyles();
   }
 
+  /**
+   * 清理HTML内容，防止XSS攻击
+   */
+  private sanitizeHtml(html: string): string {
+    if (!html || typeof html !== 'string') {
+      return '';
+    }
+    
+    // 移除潜在的危险标签和属性
+    return html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+      .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')
+      .replace(/<embed[^>]*>/gi, '')
+      .replace(/<link[^>]*>/gi, '')
+      .replace(/on\w+\s*=\s*["'][^"']{0,500}?["']/gi, '') // 修复ReDoS风险
+      .replace(/javascript:/gi, '')
+      .replace(/vbscript:/gi, '')
+      .replace(/data:/gi, '')
+      .replace(/<meta[^>]*>/gi, '');
+  }
+
   private initializeStyles() {
     // 预定义样式映射
     this.styleMap.set('h1', {
@@ -346,13 +368,15 @@ class EnhancedHtmlToDocxConverter {
 
   private createTextRuns(element: ParsedElement, baseStyle: StyleMapping, $: any): any[] {
     const runs: any[] = [];
-    const html = element.html;
+    const { html } = element;
 
     if (!html) {
       return [this.createSimpleTextRun(element.text, baseStyle)];
     }
 
-    const $content = $(html);
+    // 清理HTML内容防止XSS
+    const sanitizedHtml = this.sanitizeHtml(html);
+    const $content = $(sanitizedHtml);
 
     if ($content.length === 0) {
       return [this.createSimpleTextRun(element.text, baseStyle)];
@@ -481,7 +505,8 @@ class EnhancedHtmlToDocxConverter {
 
   private createListElements(element: ParsedElement, baseStyle: StyleMapping, $: any): any[] {
     const paragraphs: any[] = [];
-    const $list = $(element.html);
+    const sanitizedHtml = this.sanitizeHtml(element.html);
+    const $list = $(sanitizedHtml);
 
     $list.find('li').each((i: number, li: any) => {
       const $li = $(li);
@@ -508,7 +533,8 @@ class EnhancedHtmlToDocxConverter {
 
   private createTableElements(element: ParsedElement, baseStyle: StyleMapping, $: any): any[] {
     const paragraphs: any[] = [];
-    const $table = $(element.html);
+    const sanitizedHtml = this.sanitizeHtml(element.html);
+    const $table = $(sanitizedHtml);
 
     // 简化的表格处理 - 转换为段落
     $table.find('tr').each((i: number, tr: any) => {

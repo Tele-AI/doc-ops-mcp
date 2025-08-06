@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import { promisify } from 'util';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
+const { rgb } = require('pdf-lib');
 
 interface DocumentContent {
   title?: string;
@@ -168,34 +169,34 @@ export class DocumentConverter {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${content.title || '文档'}</title>
-    ${content.author ? `<meta name="author" content="${content.author}">` : ''}
-    ${content.description ? `<meta name="description" content="${content.description}">` : ''}
+    <title>${this.escapeHtml(content.title || '文档')}</title>
+    ${content.author ? `<meta name="author" content="${this.escapeHtml(content.author)}">` : ''}
+    ${content.description ? `<meta name="description" content="${this.escapeHtml(content.description)}">` : ''}
     <style>
         body {
-            font-family: '${styling.fontFamily}', 'Microsoft YaHei', 'SimHei', Arial, sans-serif;
+            font-family: '${this.escapeHtml(styling.fontFamily)}', 'Microsoft YaHei', 'SimHei', Arial, sans-serif;
             font-size: ${styling.fontSize}px;
             line-height: ${styling.lineHeight};
-            color: ${styling.colors.text};
+            color: ${this.escapeHtml(styling.colors.text)};
             max-width: 800px;
             margin: 0 auto;
             padding: ${styling.margins.top / 4}px ${styling.margins.left / 4}px;
             background-color: #fff;
         }
         h1, h2, h3, h4, h5, h6 {
-            color: ${styling.colors.primary};
+            color: ${this.escapeHtml(styling.colors.primary)};
             margin-top: 30px;
             margin-bottom: 15px;
         }
         h1 {
             font-size: 2.5em;
             text-align: center;
-            border-bottom: 3px solid ${styling.colors.primary};
+            border-bottom: 3px solid ${this.escapeHtml(styling.colors.primary)};
             padding-bottom: 10px;
         }
         h2 {
             font-size: 1.8em;
-            border-left: 4px solid ${styling.colors.primary};
+            border-left: 4px solid ${this.escapeHtml(styling.colors.primary)};
             padding-left: 15px;
         }
         h3 {
@@ -209,7 +210,7 @@ export class DocumentConverter {
         .meta-info {
             background-color: #f8f9fa;
             padding: 15px;
-            border-left: 4px solid ${styling.colors.secondary};
+            border-left: 4px solid ${this.escapeHtml(styling.colors.secondary)};
             margin-bottom: 30px;
             border-radius: 4px;
         }
@@ -225,7 +226,7 @@ export class DocumentConverter {
             margin-bottom: 5px;
         }
         blockquote {
-            border-left: 4px solid ${styling.colors.secondary};
+            border-left: 4px solid ${this.escapeHtml(styling.colors.secondary)};
             margin: 20px 0;
             padding: 10px 20px;
             background-color: #f8f9fa;
@@ -252,17 +253,17 @@ export class DocumentConverter {
     </style>
 </head>
 <body>
-    ${content.title ? `<h1>${content.title}</h1>` : ''}
+    ${content.title ? `<h1>${this.escapeHtml(content.title)}</h1>` : ''}
     ${
       content.author || content.description
         ? `
     <div class="meta-info">
-        ${content.author ? `<p><strong>作者:</strong> ${content.author}</p>` : ''}
-        ${content.description ? `<p><strong>描述:</strong> ${content.description}</p>` : ''}
+        ${content.author ? `<p><strong>作者:</strong> ${this.escapeHtml(content.author)}</p>` : ''}
+        ${content.description ? `<p><strong>描述:</strong> ${this.escapeHtml(content.description)}</p>` : ''}
     </div>`
         : ''
     }
-    ${htmlContent}
+    ${this.escapeHtml(htmlContent)}
 </body>
 </html>
       `;
@@ -409,20 +410,19 @@ export class DocumentConverter {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>${content.title || 'Document'}</title>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap');
-        
+        /* 使用本地字体，避免外部资源引用的安全风险 */
         body {
-            font-family: 'Noto Sans SC', '微软雅黑', 'Microsoft YaHei', Arial, sans-serif;
-            font-size: ${fontSize}px;
-            line-height: ${styling.lineHeight};
-            color: ${colors.text};
+            font-family: '微软雅黑', 'Microsoft YaHei', 'SimHei', 'Noto Sans SC', Arial, sans-serif;
+            font-size: ${this.escapeHtml(fontSize.toString())}px;
+            line-height: ${this.escapeHtml(styling.lineHeight.toString())};
+            color: ${this.escapeHtml(colors.text)};
             margin: 0;
             padding: 20px;
             background: white;
         }
         
         h1 {
-            color: ${colors.primary};
+            color: ${this.escapeHtml(colors.primary)};
             font-size: ${fontSize * 1.8}px;
             font-weight: 700;
             margin-bottom: 20px;
@@ -430,7 +430,7 @@ export class DocumentConverter {
         }
         
         h2 {
-            color: ${colors.primary};
+            color: ${this.escapeHtml(colors.primary)};
             font-size: ${fontSize * 1.4}px;
             font-weight: 700;
             margin-top: 30px;
@@ -439,7 +439,7 @@ export class DocumentConverter {
         }
         
         h3 {
-            color: ${colors.primary};
+            color: ${this.escapeHtml(colors.primary)};
             font-size: ${fontSize * 1.2}px;
             font-weight: 700;
             margin-top: 25px;
@@ -466,13 +466,13 @@ export class DocumentConverter {
         }
         
         .author {
-            color: ${colors.secondary};
+            color: ${this.escapeHtml(colors.secondary)};
             font-size: ${fontSize * 0.9}px;
             margin-bottom: 10px;
         }
         
         .description {
-            color: ${colors.secondary};
+            color: ${this.escapeHtml(colors.secondary)};
             font-size: ${fontSize * 0.9}px;
             margin-bottom: 20px;
             font-style: italic;
@@ -775,25 +775,25 @@ export class DocumentConverter {
 
         // 检查是否是标题
         if (trimmed.startsWith('# ')) {
-          return `<h1>${trimmed.substring(2)}</h1>`;
+          return `<h1>${this.escapeHtml(trimmed.substring(2))}</h1>`;
         } else if (trimmed.startsWith('## ')) {
-          return `<h2>${trimmed.substring(3)}</h2>`;
+          return `<h2>${this.escapeHtml(trimmed.substring(3))}</h2>`;
         } else if (trimmed.startsWith('### ')) {
-          return `<h3>${trimmed.substring(4)}</h3>`;
+          return `<h3>${this.escapeHtml(trimmed.substring(4))}</h3>`;
         } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
           // 简单的列表处理
           const items = trimmed
             .split('\n')
             .map(line => {
               if (line.startsWith('- ') || line.startsWith('* ')) {
-                return `<li>${line.substring(2)}</li>`;
+                return `<li>${this.escapeHtml(line.substring(2))}</li>`;
               }
-              return line;
+              return this.escapeHtml(line);
             })
             .join('\n');
           return `<ul>\n${items}\n</ul>`;
         } else {
-          return `<p>${trimmed.replace(/\n/g, '<br>')}</p>`;
+          return `<p>${this.escapeHtml(trimmed).replace(/\n/g, '<br>')}</p>`;
         }
       })
       .filter(p => p)
@@ -1043,7 +1043,6 @@ export class DocumentConverter {
    * 将十六进制颜色转换为RGB
    */
   private hexToRgb(hex: string): any {
-    const { rgb } = require('pdf-lib');
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
     if (result) {
       return rgb(

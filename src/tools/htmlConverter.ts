@@ -56,6 +56,28 @@ interface HtmlConversionResult {
 class HtmlConverter {
   private options: HtmlConversionOptions = {};
 
+  /**
+   * 清理HTML内容，防止XSS攻击
+   */
+  private sanitizeHtml(html: string): string {
+    if (!html || typeof html !== 'string') {
+      return '';
+    }
+    
+    // 移除潜在的危险标签和属性
+    return html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+      .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')
+      .replace(/<embed[^>]*>/gi, '')
+      .replace(/<link[^>]*>/gi, '')
+      .replace(/on\w+\s*=\s*["'][^"']{0,500}?["']/gi, '') // 修复ReDoS风险
+      .replace(/javascript:/gi, '')
+      .replace(/vbscript:/gi, '')
+      .replace(/data:/gi, '')
+      .replace(/<meta[^>]*>/gi, '');
+  }
+
   constructor() {}
 
   /**
@@ -796,10 +818,11 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
    * 处理文本节点转换为TextRun
    */
   private processTextNodeToTextRun($: any, node: any, baseFontSize: number, baseFontFamily: string): any {
-    const text = $(node).text();
-    if (text.trim()) {
+    const rawText = $(node).text();
+    const sanitizedText = this.sanitizeHtml(rawText);
+    if (sanitizedText.trim()) {
       return new TextRun({
-        text: text,
+        text: sanitizedText,
         size: baseFontSize,
         font: baseFontFamily,
       });
@@ -813,7 +836,8 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
   private processTagNodeToTextRun($: any, node: any, baseFontSize: number, baseFontFamily: string): any {
     const $node = $(node);
     const tagName = $node.prop('tagName')?.toLowerCase();
-    const text = $node.text();
+    const rawText = $node.text();
+    const text = this.sanitizeHtml(rawText);
 
     if (text.trim()) {
       const styles = this.parseElementStyles($node);

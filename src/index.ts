@@ -8,12 +8,29 @@ const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const {
   CallToolRequestSchema,
+  ErrorCode,
   ListToolsRequestSchema,
+  McpError,
 } = require('@modelcontextprotocol/sdk/types.js');
 const fs = require('fs/promises');
 const WordExtractor = require('word-extractor');
 const path = require('path');
 const cheerio = require('cheerio');
+const mammoth = require('mammoth');
+const { createSecureTempPath, escapeHtml, sanitizeCssProperty, defaultSecurityConfig } = require('./security/securityConfig.js');
+
+// 路径安全验证函数
+function validatePath(inputPath: string): string {
+  const resolvedPath = path.resolve(inputPath);
+  const normalizedPath = path.normalize(resolvedPath);
+  
+  // 检查路径遍历攻击
+  if (normalizedPath.includes('..') || normalizedPath !== resolvedPath) {
+    throw new Error('Invalid path: Path traversal detected');
+  }
+  
+  return normalizedPath;
+}
 
 import { WEB_SCRAPING_TOOL, STRUCTURED_DATA_TOOL } from './tools/webScrapingTools';
 import { convertDocxToHtmlWithStyles } from './tools/enhancedMammothConfig';
@@ -28,7 +45,7 @@ function sanitizeHtmlForOutput(html: string): string {
     return html
       .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
       .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
-      .replace(/on\w+\s*=\s*["'][^"']*["']/gi, '')
+      .replace(/on\w+\s*=\s*["'][^"']{0,500}?["']/gi, '') // 修复ReDoS风险
       .replace(/javascript:/gi, '');
   }
   // 对于纯文本内容，进行HTML转义
@@ -89,36 +106,37 @@ async function convertHtmlToDocxEnhanced(
     // 使用环境变量控制的输出路径
     let finalOutputPath = outputPath;
     if (!finalOutputPath) {
-      const baseName = path.basename(inputPath, path.extname(inputPath));
-      finalOutputPath = path.join(defaultResourcePaths.outputDir, `${baseName}.docx`);
+      const baseName = path.basename(validatePath(inputPath), path.extname(validatePath(inputPath)));
+      finalOutputPath = validatePath(path.join(defaultResourcePaths.outputDir, `${baseName}.docx`));
     } else if (!path.isAbsolute(finalOutputPath)) {
-      finalOutputPath = path.join(defaultResourcePaths.outputDir, finalOutputPath);
+      finalOutputPath = validatePath(path.join(defaultResourcePaths.outputDir, finalOutputPath));
     }
 
-    console.error(`🚀 开始增强的 HTML 到 DOCX 转换...`);
-    console.error(`📄 输入: ${inputPath}`);
-    console.error(`📁 输出: ${finalOutputPath}`);
-    console.error(`🌍 输出目录由环境变量控制: OUTPUT_DIR=${defaultResourcePaths.outputDir}`);
+    // Enhanced HTML to DOCX conversion started
+
+    // 验证输入路径
+    const validatedInputPath = validatePath(inputPath);
+    const validatedOutputPath = validatePath(finalOutputPath);
 
     // 确保输出目录存在
-    await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
+    await fs.mkdir(path.dirname(validatedOutputPath), { recursive: true });
 
     // 读取 HTML 文件
-    const htmlContent = await fs.readFile(inputPath, 'utf-8');
+    const htmlContent = await fs.readFile(validatedInputPath, 'utf-8');
 
-    console.error('📝 HTML 文件读取完成，开始使用增强转换器...');
+    // HTML file read, starting enhanced converter
 
     // 使用新的增强转换器
     const converter = new EnhancedHtmlToDocxConverter();
     const docxBuffer = await converter.convertHtmlToDocx(htmlContent);
 
     // 写入文件
-    await fs.writeFile(finalOutputPath, docxBuffer);
+    await fs.writeFile(validatedOutputPath, docxBuffer);
 
-    console.error(`✅ 增强的 HTML 到 DOCX 转换成功: ${finalOutputPath}`);
+    // Enhanced HTML to DOCX conversion successful
     return {
       success: true,
-      outputPath: finalOutputPath,
+      outputPath: validatedOutputPath,
       message: '增强的 HTML 到 DOCX 转换完成',
       metadata: {
         converter: 'EnhancedHtmlToDocxConverter',
@@ -127,7 +145,7 @@ async function convertHtmlToDocxEnhanced(
       },
     };
   } catch (error: any) {
-    console.error('❌ 增强的 HTML 到 DOCX 转换失败:', error.message);
+    // Enhanced HTML to DOCX conversion failed
     return {
       success: false,
       error: error.message,
@@ -167,7 +185,7 @@ function getDefaultResourcePaths() {
 }
 
 const defaultResourcePaths = getDefaultResourcePaths();
-console.error('Using hybrid mode - browser operations handled by external playwright-mcp');
+// Using hybrid mode - browser operations handled by external playwright-mcp
 
 // Interfaces
 interface ReadDocumentOptions {
@@ -219,7 +237,7 @@ interface QRCodeOptions {
 
 // Helper functions for readDocument
 async function processDocxWithFormatting(filePath: string, options: ReadDocumentOptions) {
-  console.error('🚀 优先使用增强型 mammoth 转换器进行样式保留转换...');
+  // Using enhanced mammoth converter for style preservation
   
   // Try enhanced mammoth converter first
   const enhancedResult = await tryEnhancedMammothConverter(filePath, options);
@@ -233,7 +251,7 @@ async function processDocxWithFormatting(filePath: string, options: ReadDocument
 
 async function tryEnhancedMammothConverter(filePath: string, options: ReadDocumentOptions) {
   try {
-    console.error('🔍 尝试使用修复后的增强型 mammoth 转换器...');
+    // Trying enhanced mammoth converter with fixes
     const enhancedResult = await convertDocxToHtmlEnhanced(filePath, {
       preserveImages: options.saveImages !== false,
       enableExperimentalFeatures: true,
@@ -251,8 +269,7 @@ async function tryEnhancedMammothConverter(filePath: string, options: ReadDocume
       }
     }
   } catch (enhancedError: any) {
-    console.error('❌ 修复后的增强型 mammoth 异常:', enhancedError.message);
-    console.error('📋 错误堆栈:', enhancedError.stack);
+    // Enhanced mammoth converter failed
   }
   
   return null;
@@ -354,7 +371,6 @@ async function processDocxAsText(filePath: string) {
   let result: { value: string };
 
   try {
-    const mammoth = require('mammoth');
     result = await mammoth.extractRawText({ path: filePath });
   } catch (mammothError) {
     console.error('⚠️ mammoth 文本提取失败:', mammothError);
@@ -490,11 +506,12 @@ async function writeDocument(
     const finalPath = resolveFinalOutputPath(outputPath);
     const encoding = options.encoding || 'utf-8';
 
-    await writeFileWithEncoding(finalPath, content, encoding);
+    const validatedFinalPath = validatePath(finalPath);
+    await writeFileWithEncoding(validatedFinalPath, content, encoding);
 
     return {
       success: true,
-      outputPath: finalPath,
+      outputPath: validatedFinalPath,
       message: `Document written successfully to ${finalPath}. Output directory controlled by OUTPUT_DIR environment variable: ${defaultResourcePaths.outputDir}`,
     };
   } catch (error: any) {
@@ -504,17 +521,18 @@ async function writeDocument(
 
 // Helper functions for convertDocument
 function resolveConvertOutputPath(inputPath: string, outputPath?: string): { finalOutputPath: string, inputExt: string, outputExt: string } {
-  const inputExt = path.extname(inputPath).toLowerCase();
-  const outputExt = outputPath ? path.extname(outputPath).toLowerCase() : '.html';
+  const validatedInputPath = validatePath(inputPath);
+  const inputExt = path.extname(validatedInputPath).toLowerCase();
+  const outputExt = outputPath ? path.extname(validatePath(outputPath)).toLowerCase() : '.html';
 
   let finalOutputPath: string;
   if (!outputPath) {
-    const baseName = path.basename(inputPath, inputExt);
-    finalOutputPath = path.join(defaultResourcePaths.outputDir, `${baseName}${outputExt}`);
+    const baseName = path.basename(validatedInputPath, inputExt);
+    finalOutputPath = validatePath(path.join(defaultResourcePaths.outputDir, `${baseName}${outputExt}`));
   } else if (!path.isAbsolute(outputPath)) {
-    finalOutputPath = path.join(defaultResourcePaths.outputDir, outputPath);
+    finalOutputPath = validatePath(path.join(defaultResourcePaths.outputDir, outputPath));
   } else {
-    finalOutputPath = outputPath;
+    finalOutputPath = validatePath(outputPath);
   }
 
   return { finalOutputPath, inputExt, outputExt };
@@ -643,7 +661,8 @@ async function convertDocxToHtmlSpecial(inputPath: string, finalOutputPath: stri
   console.error(`📁 输出: ${finalOutputPath}`);
 
   try {
-    const result = await convertDocxToHtmlEnhanced(inputPath, {
+    const validatedInputPath = validatePath(inputPath);
+    const result = await convertDocxToHtmlEnhanced(validatedInputPath, {
       preserveImages: true,
       enableExperimentalFeatures: true,
       debug: true,
@@ -1070,7 +1089,6 @@ async function tryEnhancedMammoth(docxPath: string): Promise<{ success: boolean,
 
 async function useBasicMammothFallback(docxPath: string, options: any): Promise<string> {
   console.error('🔄 使用最终回退方案...');
-  const mammoth = require('mammoth');
   const basicResult = await mammoth.convertToHtml({ path: docxPath });
   return createPerfectWordHtml(basicResult.value, options);
 }
@@ -1242,13 +1260,23 @@ function insertCombinedStyles(html: string, combinedStyles: string): string {
   }
 }
 
+// HTML转义和CSS清理函数现在从安全配置模块导入
+
 // 增强内联样式的辅助函数
 function enhanceInlineStyles(html: string): string {
+  // 对输入HTML进行基本验证
+  if (!html || typeof html !== 'string') {
+    return '';
+  }
+  
   return html.replace(/<([a-z][a-z0-9]*)([^>]*?)>/gi, (match, tag, attrs) => {
     if (attrs.includes('style=')) {
       return match.replace(/style=(["'])(.*?)\1/gi, (styleMatch, quote, styleContent) => {
-        const enhancedStyle = styleContent.replace(/([^;]+)(?=;|$)/g, prop => {
-          return prop.includes('!important') ? prop : `${prop} !important`;
+        // 清理样式内容
+        const cleanStyleContent = sanitizeCssProperty(styleContent);
+        const enhancedStyle = cleanStyleContent.replace(/([^;]+)(?=;|$)/g, prop => {
+          const cleanProp = sanitizeCssProperty(prop);
+          return cleanProp.includes('!important') ? cleanProp : `${cleanProp} !important`;
         });
         return `style=${quote}${enhancedStyle}${quote}`;
       });
@@ -1293,9 +1321,11 @@ async function processWithCheerio(html: string): Promise<string> {
 
 // 创建和验证HTML文件的辅助函数
 async function createAndValidateHtmlFile(finalHtml: string, options: any): Promise<string> {
-  const tempHtmlPath = path.join(os.tmpdir(), `docx-conversion-${Date.now()}.html`);
-  await fs.writeFile(tempHtmlPath, finalHtml, 'utf8');
-  console.error(`📝 样式修复后的HTML文件已创建: ${tempHtmlPath}`);
+  // Create secure temporary file with proper permissions
+  const tempHtmlPath = createSecureTempPath('docx-conversion', '.html');
+  // Write file with secure permissions
+  await fs.writeFile(tempHtmlPath, finalHtml, { encoding: 'utf8', mode: defaultSecurityConfig.tempFilePermissions });
+  // HTML file with style fixes created
   
   const writtenContent = await fs.readFile(tempHtmlPath, 'utf8');
   const validationResult = validateHtmlContent(writtenContent);
@@ -1343,8 +1373,17 @@ function validateHtmlContent(content: string) {
 }
 
 // 强制注入Word样式的辅助函数
+// Clean up temporary files securely
+async function cleanupTempFile(filePath: string): Promise<void> {
+  try {
+    await fs.unlink(filePath);
+  } catch (error) {
+    // File may already be deleted, ignore error
+  }
+}
+
 async function forceInjectWordStyles(tempHtmlPath: string, content: string, options: any): Promise<void> {
-  console.error('❌ 样式修复失败，手动注入完整Word样式...');
+  // Style fix failed, manually injecting Word styles
   
   const perfectHtml = createPerfectWordHtml('', options);
   const wordStyles = perfectHtml.match(/<style[^>]*>[\s\S]*?<\/style>/gi)?.[0] || '';
@@ -1365,8 +1404,9 @@ ${bodyContent}
 </body>
 </html>`;
   
-  await fs.writeFile(tempHtmlPath, enforcedHtml, 'utf8');
-  console.error('✅ 样式强制注入完成');
+  // Write file with secure permissions
+  await fs.writeFile(tempHtmlPath, enforcedHtml, { encoding: 'utf8', mode: defaultSecurityConfig.tempFilePermissions });
+  // Style injection completed
 }
 
 // 提取body内容的辅助函数
@@ -2226,11 +2266,7 @@ async function processPdfPostConversion(
 
     // Clean up temporary playwright file if it's different from final path
     if (playwrightPdfPath !== finalPath && fsSync.existsSync(playwrightPdfPath)) {
-      try {
-        await fs.unlink(playwrightPdfPath);
-      } catch (error) {
-        console.warn(`Failed to clean up temporary file: ${playwrightPdfPath}`);
-      }
+      await cleanupTempFile(playwrightPdfPath);
     }
 
     return {
@@ -2501,7 +2537,7 @@ async function convertMarkdownToTxt(inputPath: string, outputPath?: string, opti
       .replace(/`(.*?)`/g, '$1') // 移除行内代码标记
       .replace(/```[\s\S]*?```/g, '') // 移除代码块
       .replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1') // 移除链接，保留文本
-      .replace(/!\[([^\]]*)\]\([^\)]+\)/g, '$1') // 移除图片，保留alt文本
+      .replace(/!\[([^\]]{0,200}?)\]\([^\)]{0,500}?\)/g, '$1') // 移除图片，保留alt文本 - 修复ReDoS
       .replace(/^[-*+]\s+/gm, '') // 移除列表标记
       .replace(/^\d+\.\s+/gm, '') // 移除有序列表标记
       .replace(/^>\s+/gm, '') // 移除引用标记

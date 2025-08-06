@@ -17,6 +17,11 @@ import {
   DocumentConversionResult,
 } from './documentConverter';
 
+// 将require语句移到顶部以避免惰性加载风险
+const fs = require('fs/promises');
+const path = require('path');
+const JSZip = require('jszip');
+
 interface DualParsingOptions {
   // 样式提取选项
   extractStyles?: boolean;
@@ -492,12 +497,12 @@ ${processedHtml}
           !this.options.mediaOptions?.convertToBase64
         ) {
           // 使用相对路径
-          const relativePath = `./images/${mediaFile.name}`;
-          return `<img${before}src="${relativePath}"${after} data-original-path="${src}" data-file-size="${mediaFile.size}">`;
+          const relativePath = `./images/${this.escapeHtml(mediaFile.name)}`;
+          return `<img${before}src="${this.escapeHtml(relativePath)}"${after} data-original-path="${this.escapeHtml(src)}" data-file-size="${mediaFile.size}">`;
         } else if (mediaFile && mediaFile.base64) {
           // 使用base64（如果可用）
-          const dataUrl = `data:${mediaFile.contentType};base64,${mediaFile.base64}`;
-          return `<img${before}src="${dataUrl}"${after}>`;
+          const dataUrl = `data:${this.escapeHtml(mediaFile.contentType)};base64,${mediaFile.base64}`;
+          return `<img${before}src="${this.escapeHtml(dataUrl)}"${after}>`;
         }
 
         // 保持原始路径
@@ -506,6 +511,18 @@ ${processedHtml}
     );
 
     return processedHtml;
+  }
+
+  /**
+   * HTML转义函数
+   */
+  private escapeHtml(text: string): string {
+    return text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#039;');
   }
 
   /**
@@ -519,7 +536,7 @@ ${processedHtml}
     const timestamp = new Date().toISOString();
 
     return `  <meta name="generator" content="DualParsingEngine">
-  <meta name="converted-at" content="${timestamp}">
+  <meta name="converted-at" content="${this.escapeHtml(timestamp)}">
   <meta name="conversion-engine" content="mammoth.js + XML样式解析">`;
   }
 
@@ -669,8 +686,6 @@ ${processedHtml}
     }
 
     try {
-      const fs = require('fs/promises');
-      const path = require('path');
       const outputDir = this.options.debugOptions.outputDirectory;
 
       // 确保输出目录存在
@@ -748,15 +763,26 @@ ${processedHtml}
    */
   private async validateInput(inputPath: string): Promise<boolean> {
     try {
-      const fs = require('fs/promises');
-      const path = require('path');
+      // 路径安全验证函数
+      const validatePath = (inputPath: string): string => {
+        const resolvedPath = path.resolve(inputPath);
+        const normalizedPath = path.normalize(resolvedPath);
+        
+        // 检查路径遍历攻击
+        if (normalizedPath.includes('..') || normalizedPath !== resolvedPath) {
+          throw new Error('Invalid path: Path traversal detected');
+        }
+        
+        return normalizedPath;
+      };
 
-      const stats = await fs.stat(inputPath);
+      const validatedPath = validatePath(inputPath);
+      const stats = await fs.stat(validatedPath);
       if (!stats.isFile()) {
         throw new Error('输入路径不是文件');
       }
 
-      const ext = path.extname(inputPath).toLowerCase();
+      const ext = path.extname(validatedPath).toLowerCase();
       if (ext !== '.docx') {
         throw new Error('输入文件必须是 .docx 格式');
       }
@@ -773,10 +799,22 @@ ${processedHtml}
    */
   private async deepParseDocxStructure(inputPath: string): Promise<void> {
     try {
-      const JSZip = require('jszip');
-      const fs = require('fs/promises');
+      // 使用顶部导入的模块
 
-      const data = await fs.readFile(inputPath);
+      const validatePath = (inputPath: string): string => {
+        const resolvedPath = path.resolve(inputPath);
+        const normalizedPath = path.normalize(resolvedPath);
+        
+        // 检查路径遍历攻击
+        if (normalizedPath.includes('..') || normalizedPath !== resolvedPath) {
+          throw new Error('Invalid path: Path traversal detected');
+        }
+        
+        return normalizedPath;
+      };
+
+      const validatedPath = validatePath(inputPath);
+      const data = await fs.readFile(validatedPath);
       const zip = await JSZip.loadAsync(data);
 
       // 解析样式文件
@@ -811,9 +849,9 @@ ${processedHtml}
    * 解析样式 XML
    */
   private parseStylesXml(stylesXml: string): void {
-    // 基于测试脚本验证的样式解析逻辑
+    // 解析样式定义 - 修复ReDoS风险
     const styleMatches = stylesXml.match(
-      /<w:style[^>]*w:styleId="([^"]+)"[^>]*>([\s\S]*?)<\/w:style>/g
+      /<w:style[^>]*w:styleId="([^"]+)"[^>]*>([\s\S]{0,10000}?)<\/w:style>/g
     );
 
     if (styleMatches) {

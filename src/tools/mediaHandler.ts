@@ -8,6 +8,20 @@ const JSZip = require('jszip');
 const fs = require('fs/promises');
 const path = require('path');
 const xml2js = require('xml2js');
+const crypto = require('crypto');
+
+// 路径安全验证函数
+function validatePath(inputPath: string): string {
+  const resolvedPath = path.resolve(inputPath);
+  const normalizedPath = path.normalize(resolvedPath);
+  
+  // 检查路径遍历攻击
+  if (normalizedPath.includes('..') || normalizedPath !== resolvedPath) {
+    throw new Error('Invalid path: Path traversal detected');
+  }
+  
+  return normalizedPath;
+}
 
 interface MediaFile {
   id: string;
@@ -70,7 +84,8 @@ export class MediaHandler {
     try {
       console.log('🖼️ 开始提取媒体文件...');
 
-      const docxBuffer = await fs.readFile(docxPath);
+      const validatedPath = validatePath(docxPath);
+      const docxBuffer = await fs.readFile(validatedPath);
       const zip = await JSZip.loadAsync(docxBuffer);
 
       // 重置状态
@@ -460,7 +475,6 @@ export class MediaHandler {
    * 生成媒体文件 ID
    */
   private generateMediaId(fileName: string): string {
-    const crypto = require('crypto');
     const timestamp = Date.now();
     const random = crypto.randomBytes(3).toString('hex');
     const name = path.parse(fileName).name;

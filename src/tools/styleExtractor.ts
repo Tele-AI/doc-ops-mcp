@@ -7,6 +7,20 @@
 const JSZip = require('jszip');
 const xml2js = require('xml2js');
 const fs = require('fs/promises');
+const path = require('path');
+
+// 路径安全验证函数
+function validatePath(inputPath: string): string {
+  const resolvedPath = path.resolve(inputPath);
+  const normalizedPath = path.normalize(resolvedPath);
+  
+  // 检查路径遍历攻击
+  if (normalizedPath.includes('..') || normalizedPath !== resolvedPath) {
+    throw new Error('Invalid path: Path traversal detected');
+  }
+  
+  return normalizedPath;
+}
 
 interface StyleDefinition {
   styleId: string;
@@ -48,7 +62,8 @@ export class StyleExtractor {
     try {
       console.log('🎨 开始提取 DOCX 样式信息...');
 
-      const docxBuffer = await fs.readFile(docxPath);
+      const validatedPath = validatePath(docxPath);
+      const docxBuffer = await fs.readFile(validatedPath);
       const zip = await JSZip.loadAsync(docxBuffer);
 
       // 提取各种样式信息

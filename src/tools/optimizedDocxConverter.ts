@@ -128,7 +128,7 @@ export class OptimizedDocxConverter {
         throw new Error(`HTML 转换失败: ${htmlResult.error}`);
       }
 
-      console.log(`✅ HTML 转换成功: ${htmlResult.htmlPath}`);
+      console.log(`✅ HTML 转换成功: ${path.basename(htmlResult.htmlPath || 'output.html')}`);
 
       // 根据目标格式进行后续处理
       const targetFormat = options.outputFormat || 'html';
@@ -275,7 +275,7 @@ export class OptimizedDocxConverter {
 
       await fs.writeFile(outputPath, markdownContent, 'utf8');
 
-      console.log(`✅ Markdown 转换完成: ${outputPath}`);
+      console.log(`✅ Markdown 转换完成: ${path.basename(outputPath)}`);
 
       return {
         success: true,
@@ -326,16 +326,16 @@ export class OptimizedDocxConverter {
 ✅ 已完成 (当前 MCP):
   1. DOCX 文件解析和样式提取
   2. 双重解析引擎处理
-  3. 样式完整的 HTML 文件生成: ${htmlResult.htmlPath}
+  3. 样式完整的 HTML 文件生成: ${path.basename(htmlResult.htmlPath)}
 
 🎯 需要执行 (playwright-mcp):
   请运行以下命令完成 PDF 转换:
   
   1. browser_navigate("file://${htmlResult.htmlPath}")
   2. browser_wait_for({ time: 3 })
-  3. browser_pdf_save({ filename: "${pdfPath}" })
+  3. browser_pdf_save({ filename: "${path.basename(pdfPath)}" })
 
-📁 最终输出: ${pdfPath}
+📁 最终输出: ${path.basename(pdfPath)}
 
 💡 优势:
   - 使用双重解析引擎确保样式完整性

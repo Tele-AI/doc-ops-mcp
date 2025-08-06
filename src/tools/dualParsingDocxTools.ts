@@ -6,6 +6,20 @@
 import { DualParsingEngine, DualParsingOptions, DualParsingResult } from './dualParsingEngine';
 const fs = require('fs/promises');
 const path = require('path');
+const { StyleExtractor } = require('./styleExtractor');
+
+// 路径安全验证函数
+function validatePath(inputPath: string): string {
+  const resolvedPath = path.resolve(inputPath);
+  const normalizedPath = path.normalize(resolvedPath);
+  
+  // 检查路径遍历攻击
+  if (normalizedPath.includes('..') || normalizedPath !== resolvedPath) {
+    throw new Error('Invalid path: Path traversal detected');
+  }
+  
+  return normalizedPath;
+}
 
 // Dual parsing DOCX to HTML tool definition
 export const DUAL_PARSING_DOCX_TO_HTML_TOOL = {
@@ -177,18 +191,23 @@ export async function dualParsingDocxToHtml(args: any): Promise<any> {
     console.log('🚀 Starting dual parsing DOCX to HTML (optimized version)...');
     console.log('📁 Input file:', docxPath);
 
+    // Validate and secure input paths
+    const validatedDocxPath = validatePath(docxPath);
+    const validatedOutputPath = outputPath ? validatePath(outputPath) : null;
+    const validatedCssOutputPath = cssOutputPath ? validatePath(cssOutputPath) : null;
+
     // Validate input file
     if (
       !(await fs
-        .access(docxPath)
+        .access(validatedDocxPath)
         .then(() => true)
         .catch(() => false))
     ) {
-      throw new Error(`Input file does not exist: ${docxPath}`);
+      throw new Error(`Input file does not exist: ${validatedDocxPath}`);
     }
 
     // Create image output directory
-    const imageOutputDir = path.join(path.dirname(docxPath), 'images');
+    const imageOutputDir = path.join(path.dirname(validatedDocxPath), 'images');
 
     // Build optimized conversion options
     const dualParsingOptions: DualParsingOptions = {
@@ -241,7 +260,7 @@ export async function dualParsingDocxToHtml(args: any): Promise<any> {
     const engine = new DualParsingEngine(dualParsingOptions);
 
     // Execute optimized conversion
-    const result: DualParsingResult = await engine.convertDocxToHtml(docxPath);
+    const result: DualParsingResult = await engine.convertDocxToHtml(validatedDocxPath);
 
     if (!result.success) {
       throw new Error(result.error || 'Conversion failed');
@@ -260,8 +279,8 @@ export async function dualParsingDocxToHtml(args: any): Promise<any> {
     });
 
     // Generate output paths
-    const htmlOutputPath = outputPath || docxPath.replace(/\.docx$/i, '_converted.html');
-    const cssPath = cssOutputPath || docxPath.replace(/\.docx$/i, '_styles.css');
+    const htmlOutputPath = validatedOutputPath || validatedDocxPath.replace(/\.docx$/i, '_converted.html');
+    const cssPath = validatedCssOutputPath || validatedDocxPath.replace(/\.docx$/i, '_styles.css');
 
     // Save HTML file
     const htmlToSave = result.completeHTML || result.html;
@@ -331,16 +350,20 @@ export async function dualParsingDocxToPdf(args: any): Promise<any> {
   try {
     const { docxPath, outputPath, options = {} } = args;
 
+    // Validate and secure input paths
+    const validatedDocxPath = validatePath(docxPath);
+    const validatedOutputPath = outputPath ? validatePath(outputPath) : null;
+
     // Validate input file
     try {
-      await fs.access(docxPath);
+      await fs.access(validatedDocxPath);
     } catch (error) {
-      throw new Error(`DOCX file does not exist: ${docxPath}`);
+      throw new Error(`DOCX file does not exist: ${validatedDocxPath}`);
     }
 
     // First convert to HTML
     const htmlResult = await dualParsingDocxToHtml({
-      docxPath,
+      docxPath: validatedDocxPath,
       options: {
         ...options,
         generateCompleteHTML: true,
@@ -353,7 +376,7 @@ export async function dualParsingDocxToPdf(args: any): Promise<any> {
     }
 
     // Generate PDF output path
-    const pdfOutputPath = outputPath || docxPath.replace(/\.docx$/i, '_converted.pdf');
+    const pdfOutputPath = validatedOutputPath || validatedDocxPath.replace(/\.docx$/i, '_converted.pdf');
 
     // Build playwright-mcp commands
     const playwrightCommands = [
@@ -425,19 +448,22 @@ export async function analyzeDocxStyles(args: any): Promise<any> {
   try {
     const { docxPath, outputPath, detailed = false } = args;
 
+    // Validate and secure input paths
+    const validatedDocxPath = validatePath(docxPath);
+    const validatedOutputPath = outputPath ? validatePath(outputPath) : null;
+
     // Validate input file
     try {
-      await fs.access(docxPath);
+      await fs.access(validatedDocxPath);
     } catch (error) {
-      throw new Error(`DOCX file does not exist: ${docxPath}`);
+      throw new Error(`DOCX file does not exist: ${validatedDocxPath}`);
     }
 
     // Create style extractor
-    const { StyleExtractor } = require('./styleExtractor');
     const extractor = new StyleExtractor();
 
     // Extract styles
-    const result = await extractor.extractStyles(docxPath);
+    const result = await extractor.extractStyles(validatedDocxPath);
 
     // Analyze styles
     const analysis = {
@@ -462,15 +488,15 @@ export async function analyzeDocxStyles(args: any): Promise<any> {
     }
 
     // Save analysis report
-    if (outputPath) {
-      await fs.writeFile(outputPath, JSON.stringify(analysis, null, 2));
+    if (validatedOutputPath) {
+      await fs.writeFile(validatedOutputPath, JSON.stringify(analysis, null, 2));
     }
 
     return {
       success: true,
       message: 'Style analysis completed',
       analysis,
-      outputPath,
+      outputPath: validatedOutputPath,
     };
   } catch (error: any) {
     console.error('❌ Style analysis failed:', error);

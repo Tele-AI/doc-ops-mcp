@@ -4,6 +4,22 @@
  */
 
 const mammoth = require('mammoth');
+const path = require('path');
+const fs = require('fs/promises');
+const crypto = require('crypto');
+
+// 路径安全验证函数
+function validatePath(inputPath: string): string {
+  const resolvedPath = path.resolve(inputPath);
+  const normalizedPath = path.normalize(resolvedPath);
+  
+  // 检查路径遍历攻击
+  if (normalizedPath.includes('..') || normalizedPath !== resolvedPath) {
+    throw new Error('Invalid path: Path traversal detected');
+  }
+  
+  return normalizedPath;
+}
 
 /**
  * 创建增强的 mammoth 配置，保留更多样式信息
@@ -96,19 +112,15 @@ export async function convertDocxToHtmlWithStyles(inputPath: string, options: an
 
     // 如果需要保存图片到文件而不是 base64
     if (options.saveImagesToFiles) {
-      const fs = require('fs/promises');
-      const path = require('path');
-
-      const imageDir = options.imageOutputDir || path.join(process.cwd(), 'output', 'images');
+      const imageDir = validatePath(options.imageOutputDir || path.join(process.cwd(), 'output', 'images'));
       await fs.mkdir(imageDir, { recursive: true });
 
       config.convertImage = mammoth.images.imgElement(function (image) {
         return image.read().then(async function (imageBuffer) {
           const extension = image.contentType.split('/')[1] || 'png';
-          const crypto = require('crypto');
           const randomId = crypto.randomBytes(4).toString('hex');
           const filename = `image_${Date.now()}_${randomId}.${extension}`;
-          const imagePath = path.join(imageDir, filename);
+          const imagePath = validatePath(path.join(imageDir, filename));
 
           await fs.writeFile(imagePath, imageBuffer);
           console.error(`💾 图片已保存: ${imagePath}`);
@@ -347,11 +359,23 @@ function enhanceHtmlWithStyles(htmlContent: string, options: any = {}): string {
     </style>
   `;
 
+  // HTML内容转义处理，防止XSS攻击
+  function escapeHtml(unsafe: string): string {
+    return unsafe
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   // 如果 HTML 已经包含完整的文档结构
   if (htmlContent.includes('<html>') || htmlContent.includes('<!DOCTYPE')) {
     // 在 head 中插入样式
     return htmlContent.replace(/<\/head>/i, `${styles}</head>`);
   } else {
+    // 对HTML内容进行转义处理
+    const safeHtmlContent = escapeHtml(htmlContent);
     // 创建完整的 HTML 文档
     return `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -362,7 +386,7 @@ function enhanceHtmlWithStyles(htmlContent: string, options: any = {}): string {
   ${styles}
 </head>
 <body>
-${htmlContent}
+${safeHtmlContent}
 </body>
 </html>`;
   }

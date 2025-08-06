@@ -31,6 +31,28 @@ interface HtmlToMarkdownResult {
 class EnhancedHtmlToMarkdownConverter {
   private options: HtmlToMarkdownOptions = {};
 
+  /**
+   * 清理HTML内容，防止XSS攻击
+   */
+  private sanitizeHtml(html: string): string {
+    if (!html || typeof html !== 'string') {
+      return '';
+    }
+    
+    // 移除潜在的危险标签和属性
+    return html
+      .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
+      .replace(/<iframe[^>]*>[\s\S]*?<\/iframe>/gi, '')
+      .replace(/<object[^>]*>[\s\S]*?<\/object>/gi, '')
+      .replace(/<embed[^>]*>/gi, '')
+      .replace(/<link[^>]*>/gi, '')
+      .replace(/on\w+\s*=\s*["'][^"']{0,500}?["']/gi, '') // 修复ReDoS风险
+      .replace(/javascript:/gi, '')
+      .replace(/vbscript:/gi, '')
+      .replace(/data:/gi, '')
+      .replace(/<meta[^>]*>/gi, '');
+  }
+
   async convertHtmlToMarkdown(
     inputPath: string,
     options: HtmlToMarkdownOptions = {}
@@ -410,7 +432,9 @@ class EnhancedHtmlToMarkdownConverter {
   private processInlineTag($: any, node: any): string {
     const $node = $(node);
     const tagName = $node.prop('tagName')?.toLowerCase();
-    const nodeText = this.decodeHtmlEntities($node.text());
+    const rawText = $node.text();
+    const sanitizedText = this.sanitizeHtml(rawText);
+    const nodeText = this.decodeHtmlEntities(sanitizedText);
 
     switch (tagName) {
       case 'strong':

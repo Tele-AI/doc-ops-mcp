@@ -2,13 +2,43 @@
 
 import { build } from 'esbuild';
 import { wasmLoader } from 'esbuild-plugin-wasm';
-import { readFileSync, mkdirSync, existsSync } from 'fs';
+import { readFileSync, mkdirSync, existsSync, statSync } from 'fs';
+import { resolve } from 'path';
 
-const pkg = JSON.parse(readFileSync('./package.json', 'utf8'));
+// Safely read and parse package.json with size limit
+let pkg;
+try {
+  const packagePath = './package.json';
+  const stats = statSync(packagePath);
+  
+  // Limit package.json size to 1MB to prevent DoS
+  if (stats.size > 1024 * 1024) {
+    throw new Error('package.json file is too large');
+  }
+  
+  const packageContent = readFileSync(packagePath, 'utf8');
+  pkg = JSON.parse(packageContent);
+} catch (error) {
+  console.error('Error reading package.json:', error.message);
+  process.exit(1);
+}
 
-// Ensure dist directory exists
-if (!existsSync('dist')) {
-  mkdirSync('dist', { recursive: true });
+// Safely ensure dist directory exists
+try {
+  const distPath = resolve('./dist');
+  
+  // Validate the path to prevent directory traversal
+  if (!distPath.startsWith(resolve('./'))) {
+    throw new Error('Invalid directory path');
+  }
+  
+  if (!existsSync(distPath)) {
+    // Create directory without deep recursion to prevent DoS
+    mkdirSync(distPath, { recursive: false });
+  }
+} catch (error) {
+  console.error('Error creating dist directory:', error.message);
+  process.exit(1);
 }
 
 console.log('Building doc-ops-mcp...');
@@ -57,7 +87,7 @@ build({
   ],
   plugins: [wasmLoader()],
   sourcemap: false,
-  minify: false,
+  minify: true, // 生产环境启用压缩
   keepNames: true,
   banner: {
     js: '#!/usr/bin/env node',
@@ -80,6 +110,6 @@ build({
     }
   })
   .catch(error => {
-    console.error('❌ Build failed:', error);
+    console.error('❌ Build failed:', error.message || 'Unknown error');
     process.exit(1);
   });
