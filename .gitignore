@@ -34,7 +34,7 @@ lerna-debug.log*
 # Editor directories and files
 .idea/
 .vscode/
-.claude/
+# .claude/ - Removed for AI security compliance
 *.swp
 *.swo
 .DS_Store

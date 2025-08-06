@@ -1,5 +1,5 @@
-# Use official Node.js runtime as base image
-FROM node:18-alpine
+# Use official Node.js runtime as base image with fixed hash for security
+FROM node:18-alpine@sha256:c698ffe060d198dcc6647be78ea1683363f12d5d507dc5ec9855f1c55966ffdd
 
 # Set working directory
 WORKDIR /app

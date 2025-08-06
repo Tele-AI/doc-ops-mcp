@@ -19,8 +19,7 @@ services:
       - CHOWN  # Only add necessary capabilities
       - DAC_OVERRIDE
       - FOWNER
-      - SETGID
-      - SETUID
+      # Removed SETGID and SETUID to prevent privilege escalation
 
     # Environment variables
     environment:
@@ -32,10 +31,10 @@ services:
 
     # Volumes for file operations
     volumes:
-      - ./documents:/app/documents:rw
+      - ./documents:/app/documents:rw,noexec,nosuid,nodev
       - ./resources:/app/resources:ro
-      - ./temp:/app/temp:rw
-      - /tmp:/tmp:rw  # Writable temp directory
+      - ./temp:/app/temp:rw,noexec,nosuid,nodev
+      - /tmp:/tmp:rw,noexec,nosuid,nodev  # Writable temp directory with security restrictions
 
     # Networks
     networks:
@@ -80,17 +79,16 @@ services:
     cap_add:
       - CHOWN
       - DAC_OVERRIDE
-      - SETGID
-      - SETUID
       - NET_BIND_SERVICE
+      # Removed SETGID and SETUID to prevent privilege escalation
     
     ports:
-      - '8080:80'
+      - '127.0.0.1:8080:80'  # Bind to localhost only to prevent external exposure
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - ./documents:/var/www/documents:ro
-      - /var/cache/nginx:/var/cache/nginx:rw  # Writable cache directory
-      - /var/run:/var/run:rw  # Writable run directory
+      - /var/cache/nginx:/var/cache/nginx:rw,noexec,nosuid,nodev  # Writable cache directory with security restrictions
+      - /var/run:/var/run:rw,noexec,nosuid,nodev  # Writable run directory with security restrictions
     networks:
       - mcp-network
     depends_on:

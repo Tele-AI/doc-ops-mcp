@@ -1497,7 +1497,7 @@ function createPlaywrightSteps(finalOutputPath: string, tempHtmlPath: string) {
             }
             styles.forEach(style => {
               if (style.sheet) {
-                console.log(\`样式表已加载，规则数: \${style.sheet.cssRules.length}\`);
+                // Style sheet loaded with rules
               }
             });
           }
@@ -1517,7 +1517,7 @@ function createPlaywrightSteps(finalOutputPath: string, tempHtmlPath: string) {
         function: () => {
           document.querySelectorAll('style').forEach(style => {
             if (style.sheet) {
-              console.log(`样式表已加载，规则数: ${style.sheet.cssRules.length}`);
+              // Style sheet loaded with rules
             }
           });
           document.body.style.visibility = 'hidden';

@@ -86,7 +86,7 @@ build({
     'jsbn',
   ],
   plugins: [wasmLoader()],
-  sourcemap: false,
+  sourcemap: false, // Disable source maps for production security
   minify: true, // 生产环境启用压缩
   keepNames: true,
   banner: {
@@ -95,7 +95,7 @@ build({
   define: {
     'process.env.NODE_ENV': '"production"',
   },
-  logLevel: 'info',
+  logLevel: 'warning', // Reduced debug output for production
 })
   .then(async () => {
     console.log('✅ Build completed successfully');
