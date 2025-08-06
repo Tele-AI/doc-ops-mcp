@@ -4,15 +4,15 @@ FROM node:18-alpine@sha256:c698ffe060d198dcc6647be78ea1683363f12d5d507dc5ec9855f
 # Set working directory
 WORKDIR /app
 
-# Install system dependencies for headless Chrome
+# Install system dependencies for headless Chrome with version pinning
 RUN apk add --no-cache \
-    chromium \
-    nss \
-    freetype \
-    freetype-dev \
-    harfbuzz \
-    ca-certificates \
-    ttf-liberation \
+    chromium=119.0.6045.159-r0 \
+    nss=3.94-r0 \
+    freetype=2.13.0-r5 \
+    freetype-dev=2.13.0-r5 \
+    harfbuzz=8.2.2-r0 \
+    ca-certificates=20230506-r0 \
+    ttf-liberation=2.1.5-r1 \
     && rm -rf /var/cache/apk/*
 
 # Set environment variables for Playwright
@@ -27,11 +27,11 @@ RUN mkdir -p /app/dist /app/documents /app/resources /app/temp
 COPY package*.json ./
 COPY pnpm-lock.yaml ./
 
-# Install pnpm
-RUN npm install -g pnpm
+# Install pnpm with fixed version to prevent dependency confusion
+RUN npm install -g pnpm@8.15.1 --registry=https://registry.npmjs.org/
 
-# Install dependencies
-RUN pnpm install --frozen-lockfile --prod
+# Install dependencies with explicit registry to prevent dependency confusion
+RUN pnpm install --frozen-lockfile --prod --registry=https://registry.npmjs.org/
 
 # Copy built application
 COPY dist/ ./dist/

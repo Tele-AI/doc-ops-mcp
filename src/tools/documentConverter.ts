@@ -131,8 +131,15 @@ export class DocumentConverter {
       markdown += content.content;
 
       // 保存文件
+      const { validateAndSanitizePath } = require('../security/securityConfig');
+      const allowedPaths = [process.cwd()];
+      const validatedPath = validateAndSanitizePath(outputPath, allowedPaths);
+      if (!validatedPath) {
+        throw new Error('Invalid output path');
+      }
       const writeFile = promisify(fs.writeFile);
-      await writeFile(outputPath, markdown, 'utf-8');
+      await writeFile(validatedPath, markdown, 'utf-8');
+      outputPath = validatedPath;
 
       const stats = await promisify(fs.stat)(outputPath);
 

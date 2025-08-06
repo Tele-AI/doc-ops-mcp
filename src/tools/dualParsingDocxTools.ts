@@ -206,8 +206,9 @@ export async function dualParsingDocxToHtml(args: any): Promise<any> {
       throw new Error(`Input file does not exist: ${validatedDocxPath}`);
     }
 
-    // Create image output directory
-    const imageOutputDir = path.join(path.dirname(validatedDocxPath), 'images');
+    // Create image output directory - 使用安全的路径处理
+    const { safePathJoin } = require('../security/securityConfig');
+    const imageOutputDir = safePathJoin(path.dirname(validatedDocxPath), 'images');
 
     // Build optimized conversion options
     const dualParsingOptions: DualParsingOptions = {
@@ -309,12 +310,15 @@ export async function dualParsingDocxToHtml(args: any): Promise<any> {
         html: result.html,
         css: result.css,
         completeHTML: result.completeHTML,
-        mediaFiles: result.mediaFiles.map(f => ({
-          name: f.name,
-          type: f.type,
-          size: f.size,
-          localPath: path.join(imageOutputDir, f.name),
-        })),
+        mediaFiles: result.mediaFiles.map(f => {
+          const { safePathJoin } = require('../security/securityConfig');
+          return {
+            name: f.name,
+            type: f.type,
+            size: f.size,
+            localPath: safePathJoin(imageOutputDir, f.name),
+          };
+        }),
         outputPath: htmlOutputPath,
         cssOutputPath: cssOutputPath,
       },

@@ -177,8 +177,46 @@ class EnhancedMammothConverter {
    * 设置样式属性的辅助方法
    */
   private setStyleProperty(styleObj: any, property: string, value: string) {
-    styleObj.css[property] = value;
-    styleObj.mammothMap[property] = value;
+    // Validate property name to prevent prototype pollution and injection attacks
+    if (!property || typeof property !== 'string' || property.includes('__proto__') || property.includes('constructor') || property.includes('prototype')) {
+      // Invalid property name detected - silently return for security
+      return;
+    }
+    
+    // Whitelist allowed CSS properties
+    const allowedProperties = [
+      'font-family', 'font-size', 'font-weight', 'font-style',
+      'color', 'background-color', 'text-align', 'text-decoration',
+      'margin', 'margin-top', 'margin-bottom', 'margin-left', 'margin-right',
+      'padding', 'padding-top', 'padding-bottom', 'padding-left', 'padding-right',
+      'border', 'border-top', 'border-bottom', 'border-left', 'border-right',
+      'line-height', 'text-indent', 'vertical-align'
+    ];
+    
+    if (!allowedProperties.includes(property)) {
+      // Property not in whitelist - silently return for security
+      return;
+    }
+    
+    // Sanitize value
+    if (typeof value !== 'string') {
+      value = String(value);
+    }
+    
+    // Use Object.defineProperty for safer property setting
+    Object.defineProperty(styleObj.css, property, {
+      value: value,
+      writable: true,
+      enumerable: true,
+      configurable: true
+    });
+    
+    Object.defineProperty(styleObj.mammothMap, property, {
+      value: value,
+      writable: true,
+      enumerable: true,
+      configurable: true
+    });
   }
 
   /**

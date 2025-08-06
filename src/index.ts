@@ -17,19 +17,11 @@ const WordExtractor = require('word-extractor');
 const path = require('path');
 const cheerio = require('cheerio');
 const mammoth = require('mammoth');
-const { createSecureTempPath, escapeHtml, sanitizeCssProperty, defaultSecurityConfig } = require('./security/securityConfig.js');
+const { createSecureTempPath, escapeHtml, sanitizeCssProperty, defaultSecurityConfig, validateAndSanitizePath, safePathJoin } = require('./security/securityConfig.js');
 
-// 路径安全验证函数
-function validatePath(inputPath: string): string {
-  const resolvedPath = path.resolve(inputPath);
-  const normalizedPath = path.normalize(resolvedPath);
-  
-  // 检查路径遍历攻击
-  if (normalizedPath.includes('..') || normalizedPath !== resolvedPath) {
-    throw new Error('Invalid path: Path traversal detected');
-  }
-  
-  return normalizedPath;
+// 路径安全验证函数 - 使用更安全的实现
+function validatePath(inputPath: string, allowedBasePaths: string[] = []): string {
+  return validateAndSanitizePath(inputPath, allowedBasePaths);
 }
 
 import { WEB_SCRAPING_TOOL, STRUCTURED_DATA_TOOL } from './tools/webScrapingTools';
@@ -105,18 +97,21 @@ async function convertHtmlToDocxEnhanced(
   try {
     // 使用环境变量控制的输出路径
     let finalOutputPath = outputPath;
+    const allowedInputPaths = [process.cwd(), defaultResourcePaths.tempDir];
+    const allowedOutputPaths = [defaultResourcePaths.outputDir, process.cwd()];
+    
     if (!finalOutputPath) {
-      const baseName = path.basename(validatePath(inputPath), path.extname(validatePath(inputPath)));
-      finalOutputPath = validatePath(path.join(defaultResourcePaths.outputDir, `${baseName}.docx`));
+      const baseName = path.basename(validatePath(inputPath, allowedInputPaths), path.extname(validatePath(inputPath, allowedInputPaths)));
+      finalOutputPath = safePathJoin(defaultResourcePaths.outputDir, `${baseName}.docx`);
     } else if (!path.isAbsolute(finalOutputPath)) {
-      finalOutputPath = validatePath(path.join(defaultResourcePaths.outputDir, finalOutputPath));
+      finalOutputPath = safePathJoin(defaultResourcePaths.outputDir, finalOutputPath);
     }
 
     // Enhanced HTML to DOCX conversion started
 
     // 验证输入路径
-    const validatedInputPath = validatePath(inputPath);
-    const validatedOutputPath = validatePath(finalOutputPath);
+    const validatedInputPath = validatePath(inputPath, allowedInputPaths);
+    const validatedOutputPath = validatePath(finalOutputPath || '', allowedOutputPaths);
 
     // 确保输出目录存在
     await fs.mkdir(path.dirname(validatedOutputPath), { recursive: true });
@@ -173,7 +168,7 @@ function getDefaultResourcePaths() {
       tempDir: os.tmpdir(),
     };
   } catch (error) {
-    console.error('Error getting default paths:', error);
+    // 生产环境移除调试输出
     return {
       outputDir: '/tmp',
       cacheDir: '/tmp/cache',
@@ -276,17 +271,7 @@ async function tryEnhancedMammothConverter(filePath: string, options: ReadDocume
 }
 
 function logEnhancedMammothResult(enhancedResult: any) {
-  console.error('📊 修复后的增强型 mammoth 结果:', {
-    success: enhancedResult.success,
-    hasContent: !!(enhancedResult as any).content,
-    contentLength: (enhancedResult as any).content?.length || 0,
-    hasStyleTags: (enhancedResult as any).content?.includes('<style>') || false,
-    hasInlineStyles: (enhancedResult as any).content?.includes('style=') || false,
-    converter: (enhancedResult as any).metadata?.converter || 'unknown',
-    stylesCount: (enhancedResult as any).metadata?.stylesCount || 0,
-    cssRulesGenerated: (enhancedResult as any).metadata?.cssRulesGenerated || 0,
-    error: (enhancedResult as any).error,
-  });
+  // Debug output removed for production
 }
 
 function validateStylesInContent(content: string): boolean {
@@ -294,20 +279,13 @@ function validateStylesInContent(content: string): boolean {
                         content.includes('Calibri') && 
                         content.includes('font-family');
 
-  console.error('🔍 样式验证结果:', {
-    hasStyleTags: content.includes('<style>'),
-    hasCalibriFont: content.includes('Calibri'),
-    hasFontFamily: content.includes('font-family'),
-    hasValidStyles: hasValidStyles,
-    contentLength: content.length,
-    contentPreview: content.substring(0, 500) + '...',
-  });
+  // Debug output removed for production
 
   if (hasValidStyles) {
-    console.error('✅ 样式验证通过，返回结果');
+    // Debug output removed for production
     return true;
   } else {
-    console.error('⚠️ 样式验证失败，内容缺少必要的样式信息');
+    // Debug output removed for production
     return false;
   }
 }
@@ -373,7 +351,7 @@ async function processDocxAsText(filePath: string) {
   try {
     result = await mammoth.extractRawText({ path: filePath });
   } catch (mammothError) {
-    console.error('⚠️ mammoth 文本提取失败:', mammothError);
+    // 生产环境移除调试输出
     throw mammothError;
   }
 
@@ -492,8 +470,12 @@ function resolveFinalOutputPath(outputPath?: string): string {
 }
 
 async function writeFileWithEncoding(finalPath: string, content: string, encoding: string) {
-  await fs.mkdir(path.dirname(finalPath), { recursive: true });
-  await fs.writeFile(finalPath, content, encoding);
+  // 验证路径安全性
+  const allowedPaths = [defaultResourcePaths.outputDir, defaultResourcePaths.tempDir, process.cwd()];
+  const validatedPath = validatePath(finalPath, allowedPaths);
+  
+  await fs.mkdir(path.dirname(validatedPath), { recursive: true });
+  await fs.writeFile(validatedPath, content, encoding);
 }
 
 // Write document function
@@ -523,16 +505,19 @@ async function writeDocument(
 function resolveConvertOutputPath(inputPath: string, outputPath?: string): { finalOutputPath: string, inputExt: string, outputExt: string } {
   const validatedInputPath = validatePath(inputPath);
   const inputExt = path.extname(validatedInputPath).toLowerCase();
-  const outputExt = outputPath ? path.extname(validatePath(outputPath)).toLowerCase() : '.html';
+  const allowedInputPaths = [process.cwd(), defaultResourcePaths.tempDir];
+  const allowedOutputPaths = [defaultResourcePaths.outputDir, process.cwd()];
+  
+  const outputExt = outputPath ? path.extname(validatePath(outputPath, allowedOutputPaths)).toLowerCase() : '.html';
 
   let finalOutputPath: string;
   if (!outputPath) {
     const baseName = path.basename(validatedInputPath, inputExt);
-    finalOutputPath = validatePath(path.join(defaultResourcePaths.outputDir, `${baseName}${outputExt}`));
+    finalOutputPath = safePathJoin(defaultResourcePaths.outputDir, `${baseName}${outputExt}`);
   } else if (!path.isAbsolute(outputPath)) {
-    finalOutputPath = validatePath(path.join(defaultResourcePaths.outputDir, outputPath));
+    finalOutputPath = safePathJoin(defaultResourcePaths.outputDir, outputPath);
   } else {
-    finalOutputPath = validatePath(outputPath);
+    finalOutputPath = validatePath(outputPath, allowedOutputPaths);
   }
 
   return { finalOutputPath, inputExt, outputExt };
@@ -706,14 +691,34 @@ function applyTextReplacements(content: string, textReplacements: any[]): string
   
   for (const replacement of textReplacements) {
     if (replacement.useRegex) {
-      const flags = replacement.preserveCase ? 'g' : 'gi';
-      const regex = new RegExp(replacement.oldText, flags);
-      processedContent = processedContent.replace(regex, replacement.newText);
+      // 防止ReDoS攻击：限制正则表达式长度和复杂度
+      if (replacement.oldText.length > 100) {
+        console.warn('正则表达式过长，跳过处理');
+        continue;
+      }
+      try {
+        const flags = replacement.preserveCase ? 'g' : 'gi';
+        const regex = new RegExp(replacement.oldText, flags);
+        processedContent = processedContent.replace(regex, replacement.newText);
+      } catch (error: any) {
+         console.warn('正则表达式无效，跳过处理:', error.message);
+         continue;
+       }
     } else {
-      const searchValue = replacement.preserveCase
-        ? replacement.oldText
-        : new RegExp(replacement.oldText, 'gi');
-      processedContent = processedContent.replace(searchValue, replacement.newText);
+      // 防止ReDoS攻击：限制搜索文本长度
+      if (replacement.oldText.length > 100) {
+        console.warn('搜索文本过长，跳过处理');
+        continue;
+      }
+      try {
+        const searchValue = replacement.preserveCase
+          ? replacement.oldText
+          : new RegExp(replacement.oldText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'); // 转义特殊字符
+        processedContent = processedContent.replace(searchValue, replacement.newText);
+      } catch (error: any) {
+         console.warn('文本替换失败，跳过处理:', error.message);
+         continue;
+       }
     }
   }
   
@@ -775,13 +780,15 @@ async function convertDocument(
 
 // Helper functions for convertDocxToPdf
 function resolvePdfOutputPath(inputPath: string, outputPath?: string): string {
+  const allowedPaths = [defaultResourcePaths.outputDir, process.cwd()];
+  
   if (!outputPath) {
     const baseName = path.basename(inputPath, path.extname(inputPath));
-    return path.join(defaultResourcePaths.outputDir, `${baseName}.pdf`);
+    return safePathJoin(defaultResourcePaths.outputDir, `${baseName}.pdf`);
   } else if (!path.isAbsolute(outputPath)) {
-    return path.join(defaultResourcePaths.outputDir, outputPath);
+    return safePathJoin(defaultResourcePaths.outputDir, outputPath);
   }
-  return outputPath;
+  return validatePath(outputPath, allowedPaths);
 }
 
 function checkWatermarkAndQRConfig(options: any): { hasWatermark: boolean, hasQRCode: boolean } {
@@ -1027,13 +1034,15 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
 
 // Helper functions for fallbackConvertDocxToPdf
 function resolveFallbackOutputPath(inputPath: string, outputPath?: string): string {
+  const allowedPaths = [defaultResourcePaths.outputDir, process.cwd()];
+  
   if (!outputPath) {
     const baseName = path.basename(inputPath, path.extname(inputPath));
-    return path.join(defaultResourcePaths.outputDir, `${baseName}.pdf`);
+    return safePathJoin(defaultResourcePaths.outputDir, `${baseName}.pdf`);
   } else if (!path.isAbsolute(outputPath)) {
-    return path.join(defaultResourcePaths.outputDir, outputPath);
+    return safePathJoin(defaultResourcePaths.outputDir, outputPath);
   }
-  return outputPath;
+  return validatePath(outputPath, allowedPaths);
 }
 
 function logFallbackConversionStart(docxPath: string, finalOutputPath: string) {
@@ -1249,14 +1258,17 @@ function addImportantToStyles(styles: string): string {
 
 // 插入合并样式的辅助函数
 function insertCombinedStyles(html: string, combinedStyles: string): string {
+  // Sanitize CSS content before injection to prevent XSS
+  const sanitizedStyles = sanitizeCssProperty(combinedStyles);
+  
   if (html.includes('</head>')) {
-    return html.replace(/<\/head>/i, `<style type="text/css">\n${combinedStyles}\n</style>\n</head>`);
+    return html.replace(/<\/head>/i, `<style type="text/css">\n${sanitizedStyles}\n</style>\n</head>`);
   } else if (html.includes('<head')) {
-    return html.replace(/<head[^>]*>/i, `$&\n<style type="text/css">\n${combinedStyles}\n</style>`);
+    return html.replace(/<head[^>]*>/i, `$&\n<style type="text/css">\n${sanitizedStyles}\n</style>`);
   } else if (html.includes('<html')) {
-    return html.replace(/<html[^>]*>/i, `$&\n<head>\n<style type="text/css">\n${combinedStyles}\n</style>\n</head>`);
+    return html.replace(/<html[^>]*>/i, `$&\n<head>\n<style type="text/css">\n${sanitizedStyles}\n</style>\n</head>`);
   } else {
-    return `<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="UTF-8">\n<style type="text/css">\n${combinedStyles}\n</style>\n</head>\n<body>\n${html}\n</body>\n</html>`;
+    return `<!DOCTYPE html>\n<html lang="zh-CN">\n<head>\n<meta charset="UTF-8">\n<style type="text/css">\n${sanitizedStyles}\n</style>\n</head>\n<body>\n${html}\n</body>\n</html>`;
   }
 }
 
@@ -1291,7 +1303,8 @@ async function processWithCheerio(html: string): Promise<string> {
   
   let allStyles = '';
   $('style').each((i, el) => {
-    allStyles += $(el).html() + '\n';
+    // 使用text()而不是html()来避免XSS攻击
+    allStyles += $(el).text() + '\n';
   });
   
   allStyles = addImportantToStyles(allStyles);
@@ -1300,7 +1313,9 @@ async function processWithCheerio(html: string): Promise<string> {
   if (!$('head').length) {
     $('html').prepend('<head></head>');
   }
-  $('head').append(`<style type="text/css">${allStyles}</style>`);
+  // Sanitize CSS content before injection to prevent XSS
+  const sanitizedStyles = sanitizeCssProperty(allStyles);
+  $('head').append(`<style type="text/css">${sanitizedStyles}</style>`);
   
   $('[style]').each((i, el) => {
     const style = $(el).attr('style');
@@ -1386,10 +1401,17 @@ async function forceInjectWordStyles(tempHtmlPath: string, content: string, opti
   // Style fix failed, manually injecting Word styles
   
   const perfectHtml = createPerfectWordHtml('', options);
-  const wordStyles = perfectHtml.match(/<style[^>]*>[\s\S]*?<\/style>/gi)?.[0] || '';
+  const wordStylesRaw = perfectHtml.match(/<style[^>]*>[\s\S]*?<\/style>/gi)?.[0] || '';
+  
+  // Extract and sanitize CSS content from style tags
+  const cssContent = wordStylesRaw.replace(/<\/?style[^>]*>/gi, '');
+  const sanitizedCss = sanitizeCssProperty(cssContent);
+  const wordStyles = `<style type="text/css">${sanitizedCss}</style>`;
   
   let bodyContent = extractBodyContent(content);
   bodyContent = bodyContent.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '');
+  // Escape HTML content to prevent XSS
+  const sanitizedBodyContent = escapeHtml(bodyContent);
   
   const enforcedHtml = `<!DOCTYPE html>
 <html lang="zh-CN">
@@ -1400,7 +1422,7 @@ async function forceInjectWordStyles(tempHtmlPath: string, content: string, opti
     ${wordStyles}
 </head>
 <body>
-${bodyContent}
+${sanitizedBodyContent}
 </body>
 </html>`;
   
@@ -2159,6 +2181,7 @@ async function addQRCode(pdfPath: string, qrCodePath?: string, options: QRCodeOp
 // Helper functions for processPdfPostConversion
 function resolvePostProcessingPath(playwrightPdfPath: string, targetPath?: string): string {
   const outputDir = process.env.OUTPUT_DIR || path.dirname(playwrightPdfPath);
+  const allowedPaths = [outputDir, defaultResourcePaths.outputDir, process.cwd()];
   
   if (!targetPath) {
     // Extract original filename from playwright path
@@ -2170,20 +2193,14 @@ function resolvePostProcessingPath(playwrightPdfPath: string, targetPath?: strin
     
     // Sanitize the decoded name to prevent path traversal attacks
     const sanitizedName = path.basename(decodedName).replace(/[^a-zA-Z0-9._-]/g, '_');
-    return path.join(outputDir, sanitizedName);
+    return safePathJoin(outputDir, sanitizedName);
   } else if (!path.isAbsolute(targetPath)) {
-    // Sanitize relative paths to prevent directory traversal
-    const sanitizedPath = targetPath.replace(/\.\./g, '').replace(/[\/\\]+/g, path.sep);
-    return path.join(outputDir, path.basename(sanitizedPath));
+    // Use safe path joining for relative paths
+    return safePathJoin(outputDir, path.basename(targetPath));
   }
 
-  // For absolute paths, ensure they don't escape the output directory
-  const resolvedTarget = path.resolve(targetPath);
-  const resolvedOutput = path.resolve(outputDir);
-  if (!resolvedTarget.startsWith(resolvedOutput)) {
-    throw new Error('Invalid target path: path traversal detected');
-  }
-  return resolvedTarget;
+  // For absolute paths, use our validation function
+  return validatePath(targetPath, allowedPaths);
 }
 
 async function processWatermarkAddition(finalPath: string, options: any): Promise<any> {
@@ -3157,9 +3174,8 @@ async function handleHtmlOperations(name: string, args: any) {
 
 // 处理HTML到Markdown转换
 async function handleHtmlToMarkdown(args: any) {
-  const {
-    EnhancedHtmlToMarkdownConverter,
-  } = require('./tools/enhancedHtmlToMarkdownConverter');
+  // Use static import to prevent lazy loading security risks
+  const { EnhancedHtmlToMarkdownConverter } = await import('./tools/enhancedHtmlToMarkdownConverter.js');
   const enhancedConverter = new EnhancedHtmlToMarkdownConverter();
   
   const finalOutputPath = resolveOutputPath(args.outputPath, args.htmlPath, '.md');

@@ -52,11 +52,60 @@ export function createSecureTempPath(prefix: string, extension: string = '.tmp')
     throw new Error(`Temporary directory not allowed: ${tempDir}`);
   }
   
-  const timestamp = Date.now();
   const randomSuffix = generateSecureRandomSuffix();
-  const filename = `${prefix}-${timestamp}-${randomSuffix}${extension}`;
+  const filename = `${prefix}_${randomSuffix}${extension}`;
   
   return path.join(tempDir, filename);
+}
+
+/**
+ * Validate and sanitize file path to prevent path traversal attacks
+ */
+export function validateAndSanitizePath(inputPath: string, allowedBasePaths: string[] = []): string {
+  if (!inputPath || typeof inputPath !== 'string') {
+    throw new Error('Invalid path: path must be a non-empty string');
+  }
+
+  // Remove null bytes and other dangerous characters
+  const sanitized = inputPath.replace(/[\x00-\x1f\x7f-\x9f]/g, '');
+  
+  // Resolve the path to handle .. and . components
+  const resolvedPath = path.resolve(sanitized);
+  
+  // Check for path traversal attempts
+  if (sanitized.includes('..') || sanitized.includes('\x00')) {
+    throw new Error('Path traversal attempt detected');
+  }
+  
+  // If allowed base paths are specified, ensure the resolved path is within them
+  if (allowedBasePaths.length > 0) {
+    const isAllowed = allowedBasePaths.some(basePath => {
+      const resolvedBasePath = path.resolve(basePath);
+      return resolvedPath.startsWith(resolvedBasePath + path.sep) || resolvedPath === resolvedBasePath;
+    });
+    
+    if (!isAllowed) {
+      throw new Error(`Path outside allowed directories: ${resolvedPath}`);
+    }
+  }
+  
+  return resolvedPath;
+}
+
+/**
+ * Safe path join that prevents path traversal
+ */
+export function safePathJoin(basePath: string, ...segments: string[]): string {
+  const allowedBasePaths = [path.resolve(basePath)];
+  
+  // Validate base path
+  const validatedBasePath = validateAndSanitizePath(basePath);
+  
+  // Join all segments
+  const joinedPath = path.join(validatedBasePath, ...segments);
+  
+  // Validate the final path
+  return validateAndSanitizePath(joinedPath, allowedBasePaths);
 }
 
 /**

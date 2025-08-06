@@ -20,6 +20,8 @@ services:
       - DAC_OVERRIDE
       - FOWNER
       # Removed SETGID and SETUID to prevent privilege escalation
+    tmpfs:
+      - /tmp:noexec,nosuid,size=100m  # Secure temporary filesystem
 
     # Environment variables
     environment:
@@ -81,6 +83,9 @@ services:
       - DAC_OVERRIDE
       - NET_BIND_SERVICE
       # Removed SETGID and SETUID to prevent privilege escalation
+    tmpfs:
+      - /tmp:noexec,nosuid,size=50m  # Secure temporary filesystem
+      - /var/cache/nginx:noexec,nosuid,size=50m  # Secure cache filesystem
     
     ports:
       - '127.0.0.1:8080:80'  # Bind to localhost only to prevent external exposure

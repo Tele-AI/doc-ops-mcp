@@ -112,7 +112,11 @@ export async function convertDocxToHtmlWithStyles(inputPath: string, options: an
 
     // 如果需要保存图片到文件而不是 base64
     if (options.saveImagesToFiles) {
-      const imageDir = validatePath(options.imageOutputDir || path.join(process.cwd(), 'output', 'images'));
+      // 导入安全配置函数
+      const { safePathJoin, validateAndSanitizePath } = require('../security/securityConfig');
+      
+      const rawImageDir = options.imageOutputDir || safePathJoin(process.cwd(), 'output', 'images');
+      const imageDir = validateAndSanitizePath(rawImageDir, [process.cwd()]);
       await fs.mkdir(imageDir, { recursive: true });
 
       config.convertImage = mammoth.images.imgElement(function (image) {
@@ -120,7 +124,8 @@ export async function convertDocxToHtmlWithStyles(inputPath: string, options: an
           const extension = image.contentType.split('/')[1] || 'png';
           const randomId = crypto.randomBytes(4).toString('hex');
           const filename = `image_${Date.now()}_${randomId}.${extension}`;
-          const imagePath = validatePath(path.join(imageDir, filename));
+          const rawImagePath = safePathJoin(imageDir, filename);
+          const imagePath = validateAndSanitizePath(rawImagePath, [imageDir, process.cwd()]);
 
           await fs.writeFile(imagePath, imageBuffer);
           console.error(`💾 图片已保存: ${imagePath}`);

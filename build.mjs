@@ -19,7 +19,7 @@ try {
   const packageContent = readFileSync(packagePath, 'utf8');
   pkg = JSON.parse(packageContent);
 } catch (error) {
-  console.error('Error reading package.json:', error.message);
+  // 生产环境移除调试输出
   process.exit(1);
 }
 
@@ -37,11 +37,11 @@ try {
     mkdirSync(distPath, { recursive: false });
   }
 } catch (error) {
-  console.error('Error creating dist directory:', error.message);
+  // 生产环境移除调试输出
   process.exit(1);
 }
 
-console.log('Building doc-ops-mcp...');
+// 生产环境移除调试输出
 
 build({
   entryPoints: ['src/index.ts'],
@@ -104,12 +104,12 @@ build({
     try {
       const { chmodSync } = await import('fs');
       chmodSync('dist/index.cjs', 0o755);
-      console.log('✅ Binary permissions set');
+      // 生产环境移除调试输出
     } catch (error) {
-      console.warn('⚠️  Could not set binary permissions:', error.message);
+      // 生产环境移除调试输出
     }
   })
   .catch(error => {
-    console.error('❌ Build failed:', error.message || 'Unknown error');
+    // 生产环境移除调试输出
     process.exit(1);
   });

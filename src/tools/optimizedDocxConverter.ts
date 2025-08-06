@@ -183,18 +183,25 @@ export class OptimizedDocxConverter {
         throw new Error(result.error || '双重解析引擎转换失败');
       }
 
+      // 导入安全配置函数
+      const { safePathJoin, validateAndSanitizePath } = require('../security/securityConfig');
+      
       // 生成输出路径
       const outputDir = options.htmlOutputPath
         ? path.dirname(options.htmlOutputPath)
-        : path.join(process.cwd(), 'output');
+        : safePathJoin(process.cwd(), 'output');
+      
+      const allowedPaths = [outputDir, process.cwd()];
 
       await fs.mkdir(outputDir, { recursive: true });
 
-      const htmlPath =
+      const rawHtmlPath =
         options.htmlOutputPath ||
-        path.join(outputDir, `${path.basename(inputPath, '.docx')}_styled.html`);
+        safePathJoin(outputDir, `${path.basename(inputPath, '.docx')}_styled.html`);
+      const htmlPath = validateAndSanitizePath(rawHtmlPath, allowedPaths);
 
-      const cssPath = path.join(outputDir, `${path.basename(inputPath, '.docx')}_styles.css`);
+      const rawCssPath = safePathJoin(outputDir, `${path.basename(inputPath, '.docx')}_styles.css`);
+      const cssPath = validateAndSanitizePath(rawCssPath, allowedPaths);
 
       // 保存 HTML 文件
       await fs.writeFile(htmlPath, result.completeHTML, 'utf8');
@@ -267,11 +274,16 @@ export class OptimizedDocxConverter {
       // 注意：这里会丢失一些样式信息，但保留结构
       const markdownContent = await this.htmlToMarkdown(htmlContent);
 
+      // 导入安全配置函数
+      const { validateAndSanitizePath } = require('../security/securityConfig');
+      const allowedPaths = [path.dirname(htmlResult.htmlPath), process.cwd()];
+      
       // 生成输出路径
-      const outputPath =
+      const rawOutputPath =
         options.outputPath ||
         options.markdownOutputPath ||
         htmlResult.htmlPath.replace('.html', '.md');
+      const outputPath = validateAndSanitizePath(rawOutputPath, allowedPaths);
 
       await fs.writeFile(outputPath, markdownContent, 'utf8');
 

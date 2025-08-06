@@ -696,19 +696,29 @@ ${processedHtml}
         extractedStyles: Array.from(results.styles.entries()),
         documentStyles: results.documentStyles,
       };
+      // 导入安全配置函数
+      const { safePathJoin, validateAndSanitizePath } = require('../security/securityConfig');
+      const allowedPaths = [outputDir, process.cwd()];
+      
+      // 使用安全的路径处理
+      const stylesPath = validateAndSanitizePath(safePathJoin(outputDir, 'extracted-styles.json'), allowedPaths);
+      const mammothPath = validateAndSanitizePath(safePathJoin(outputDir, 'mammoth-result.html'), allowedPaths);
+      const cssPath = validateAndSanitizePath(safePathJoin(outputDir, 'generated-styles.css'), allowedPaths);
+      const htmlPath = validateAndSanitizePath(safePathJoin(outputDir, 'processed-html.html'), allowedPaths);
+      
       await fs.writeFile(
-        path.join(outputDir, 'extracted-styles.json'),
+        stylesPath,
         JSON.stringify(stylesData, null, 2)
       );
 
       // 保存 Mammoth 结果
-      await fs.writeFile(path.join(outputDir, 'mammoth-result.html'), results.mammothResult.html);
+      await fs.writeFile(mammothPath, results.mammothResult.html);
 
       // 保存 CSS
-      await fs.writeFile(path.join(outputDir, 'generated-styles.css'), results.cssResult.complete);
+      await fs.writeFile(cssPath, results.cssResult.complete);
 
       // 保存最终 HTML
-      await fs.writeFile(path.join(outputDir, 'processed-html.html'), results.htmlResult.html);
+      await fs.writeFile(htmlPath, results.htmlResult.html);
 
       console.log(`💾 中间结果已保存到: ${outputDir}`);
     } catch (error: any) {
@@ -776,7 +786,11 @@ ${processedHtml}
         return normalizedPath;
       };
 
-      const validatedPath = validatePath(inputPath);
+      // 导入安全配置函数
+      const { validateAndSanitizePath } = require('../security/securityConfig');
+      // Use safer path resolution to prevent security risks
+      const allowedPaths = [process.cwd(), __dirname];
+      const validatedPath = validateAndSanitizePath(inputPath, allowedPaths);
       const stats = await fs.stat(validatedPath);
       if (!stats.isFile()) {
         throw new Error('输入路径不是文件');
@@ -813,7 +827,11 @@ ${processedHtml}
         return normalizedPath;
       };
 
-      const validatedPath = validatePath(inputPath);
+      // 使用安全的路径验证
+      const { validateAndSanitizePath } = require('../security/securityConfig');
+      // Use safer path resolution to prevent security risks
+      const allowedPaths = [process.cwd(), __dirname];
+      const validatedPath = validateAndSanitizePath(inputPath, allowedPaths);
       const data = await fs.readFile(validatedPath);
       const zip = await JSZip.loadAsync(data);
 

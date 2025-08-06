@@ -265,8 +265,13 @@ export class MammothEnhancer {
             title: image.title || '',
           };
         } else if (options.imageOutputDir) {
+          // 导入安全配置函数
+          const { safePathJoin, validateAndSanitizePath } = require('../security/securityConfig');
+          const allowedPaths = [options.imageOutputDir, process.cwd()];
+          
           // 保存到文件并使用相对路径
-          const imagePath = validatePath(path.join(options.imageOutputDir, imageName));
+          const rawImagePath = safePathJoin(options.imageOutputDir, imageName);
+          const imagePath = validateAndSanitizePath(rawImagePath, allowedPaths);
           this.saveImageToFile(imagePath, imageBuffer);
 
           // 使用相对路径或缓存路径标识符
