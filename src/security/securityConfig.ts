@@ -58,28 +58,35 @@ export function createSecureTempPath(prefix: string, extension: string = '.tmp')
   return path.join(tempDir, filename);
 }
 
+// Dangerous character ranges (excluding tab and line feed)
+const DANGEROUS_CHARS_REGEX = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F-\u009F]/g;
+
 /**
  * Remove dangerous characters from path
  */
 function sanitizePath(input: string): string {
   if (!input) return '';
-  // Match and remove potentially dangerous control characters
-  // Specifically targeting null bytes, line breaks, and other special control chars
-  // Excludes tab (\x09) and line feed (\x0A) which might be legitimate in some contexts
-  return input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
+  return input.replace(DANGEROUS_CHARS_REGEX, '');
 }
 
 /**
  * Check if path contains traversal attempts
  */
 function hasPathTraversalAttempt(path: string): boolean {
-  return path.includes('..') || path.includes('\x00');
+  const normalizedPath = path.replace(/\\/g, '/'); // Normalize slashes
+  return normalizedPath.includes('../') ||
+         normalizedPath.includes('..\\') ||
+         normalizedPath.startsWith('../') ||
+         normalizedPath.endsWith('/..') ||
+         path.includes('\u0000');
 }
 
 /**
  * Check if resolved path is within allowed base paths
  */
 function isPathAllowed(resolvedPath: string, allowedBasePaths: string[]): boolean {
+  if (allowedBasePaths.length === 0) return true;
+  
   return allowedBasePaths.some(basePath => {
     const resolvedBasePath = path.resolve(basePath);
     return resolvedPath.startsWith(resolvedBasePath + path.sep) ||
@@ -99,19 +106,16 @@ export function validateAndSanitizePath(
   }
 
   const sanitizedPath = sanitizePath(inputPath);
-  
   if (hasPathTraversalAttempt(sanitizedPath)) {
     throw new Error('Path contains traversal attempt');
   }
-  
-  if (allowedBasePaths.length > 0) {
-    const resolvedPath = path.resolve(sanitizedPath);
-    if (!isPathAllowed(resolvedPath, allowedBasePaths)) {
-      throw new Error('Path is not in allowed directories');
-    }
+
+  const resolvedPath = path.resolve(sanitizedPath);
+  if (!isPathAllowed(resolvedPath, allowedBasePaths)) {
+    throw new Error('Path is not within allowed directories');
   }
-  
-  return sanitizedPath;
+
+  return resolvedPath;
 }
 
 /**
