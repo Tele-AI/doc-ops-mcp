@@ -212,8 +212,8 @@ class MarkdownToDocxConverter {
         metadata: {
           originalFormat: 'markdown',
           targetFormat: 'docx',
-          stylesPreserved: this.options.preserveStyles || false,
-          theme: this.options.theme || 'default',
+          stylesPreserved: this.options.preserveStyles ?? false,
+      theme: this.options.theme ?? 'default',
           converter: 'markdown-to-docx-converter',
           contentLength: docxBuffer.length,
           ...stats,
@@ -396,7 +396,7 @@ class MarkdownToDocxConverter {
    * 生成 DOCX 文档
    */
   private async generateDocxDocument(elements: ParsedElement[]): Promise<Document> {
-    const theme = this.themes.get(this.options.theme || 'default')!;
+    const theme = this.themes.get(this.options.theme ?? 'default')!;
     const children: any[] = [];
 
     for (const element of elements) {
@@ -444,7 +444,7 @@ class MarkdownToDocxConverter {
    * 创建标题
    */
   private createHeading(element: ParsedElement, theme: any): Paragraph {
-    const level = Math.min(element.level || 1, 6);
+    const level = Math.min(element.level ?? 1, 6);
     const headingKey = `h${level}` as keyof typeof theme.headingStyles;
     const headingStyle = theme.headingStyles[headingKey];
     const hasEmoji = this.detectEmoji(element.content);
@@ -489,7 +489,7 @@ class MarkdownToDocxConverter {
       HeadingLevel.HEADING_5,
       HeadingLevel.HEADING_6,
     ];
-    return headingLevels[level - 1] || HeadingLevel.HEADING_6;
+    return headingLevels[level - 1] ?? HeadingLevel.HEADING_6;
   }
 
   /**

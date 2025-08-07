@@ -116,7 +116,7 @@ export class OptimizedDocxConverter {
     try {
       console.log('🚀 开始优化的 DOCX 转换...');
       console.log(`📄 输入文件: ${inputPath}`);
-      console.log(`🎯 目标格式: ${options.outputFormat || 'html'}`);
+      console.log(`🎯 目标格式: ${options.outputFormat ?? 'html'}`);
 
       // 验证输入文件
       await this.validateInput(inputPath);
@@ -129,10 +129,10 @@ export class OptimizedDocxConverter {
         throw new Error(`HTML 转换失败: ${htmlResult.error}`);
       }
 
-      console.log(`✅ HTML 转换成功: ${path.basename(htmlResult.htmlPath || 'output.html')}`);
+      console.log(`✅ HTML 转换成功: ${path.basename(htmlResult.htmlPath ?? 'output.html')}`);
 
       // 根据目标格式进行后续处理
-      const targetFormat = options.outputFormat || 'html';
+      const targetFormat = options.outputFormat ?? 'html';
 
       switch (targetFormat) {
         case 'html':
@@ -154,7 +154,7 @@ export class OptimizedDocxConverter {
         error: SafeErrorHandler.sanitizeErrorMessage(error),
         details: {
           originalFormat: 'docx',
-          targetFormat: options.outputFormat || 'html',
+          targetFormat: options.outputFormat ?? 'html',
           stylesPreserved: false,
           imagesPreserved: false,
           conversionTime: Date.now() - startTime,
@@ -181,7 +181,7 @@ export class OptimizedDocxConverter {
       const result = await this.dualParsingEngine.convertDocxToHtml(inputPath);
 
       if (!result.success) {
-        throw new Error(result.error || '双重解析引擎转换失败');
+        throw new Error(result.error ?? '双重解析引擎转换失败');
       }
 
       // 导入安全配置函数
@@ -197,7 +197,7 @@ export class OptimizedDocxConverter {
       await fs.mkdir(outputDir, { recursive: true });
 
       const rawHtmlPath =
-        options.htmlOutputPath ||
+        options.htmlOutputPath ??
         safePathJoin(outputDir, `${path.basename(inputPath, '.docx')}_styled.html`);
       const htmlPath = validateAndSanitizePath(rawHtmlPath, allowedPaths);
 
@@ -241,7 +241,7 @@ export class OptimizedDocxConverter {
     options: OptimizedConversionOptions,
     startTime: number
   ): ConversionResult {
-    const finalPath = options.outputPath || htmlResult.htmlPath;
+    const finalPath = options.outputPath ?? htmlResult.htmlPath;
 
     return {
       success: true,
@@ -281,8 +281,8 @@ export class OptimizedDocxConverter {
       
       // 生成输出路径
       const rawOutputPath =
-        options.outputPath ||
-        options.markdownOutputPath ||
+        options.outputPath ??
+        options.markdownOutputPath ??
         htmlResult.htmlPath.replace('.html', '.md');
       const outputPath = validateAndSanitizePath(rawOutputPath, allowedPaths);
 
@@ -330,7 +330,7 @@ export class OptimizedDocxConverter {
     try {
       console.log('\n📄 第二步：准备 PDF 转换...');
 
-      const pdfPath = options.outputPath || htmlResult.htmlPath.replace('.html', '.pdf');
+      const pdfPath = options.outputPath ?? htmlResult.htmlPath.replace('.html', '.pdf');
 
       // 由于需要浏览器引擎来生成 PDF，我们返回指令给外部工具
       const instructions = `

@@ -505,7 +505,7 @@ export class MediaHandler {
       ico: 'image/x-icon',
     };
 
-    return contentTypes[extension] || 'application/octet-stream';
+    return contentTypes[extension] ?? 'application/octet-stream';
   }
 
   /**

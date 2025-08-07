@@ -127,8 +127,8 @@ export class StyleExtractor {
    * 解析单个样式定义
    */
   private parseStyleDefinition(style: any): StyleDefinition {
-    const styleId = style.styleId || style['w:styleId'] || 'unknown';
-    const name = style['w:name']?.val || style.name?.val || styleId;
+    const styleId = style.styleId ?? style['w:styleId'] ?? 'unknown';
+      const name = style['w:name']?.val ?? style.name?.val ?? styleId;
     const type = this.getStyleType(style.type?.val || style['w:type']?.val);
 
     const css: Record<string, string> = {};
@@ -179,7 +179,7 @@ export class StyleExtractor {
    */
   private parseAlignment(pPr: any, css: Record<string, string>): void {
     if (pPr['w:jc']) {
-      const alignmentValue = pPr['w:jc'].val || pPr['w:jc'];
+      const alignmentValue = pPr['w:jc'].val ?? pPr['w:jc'];
       if (alignmentValue && typeof alignmentValue === 'string') {
         css['text-align'] = this.convertAlignment(alignmentValue);
       }
@@ -336,7 +336,7 @@ export class StyleExtractor {
   private parseRunFont(rPr: any, css: Record<string, string>): void {
     if (rPr['w:rFonts']) {
       const fonts = rPr['w:rFonts'];
-      const fontFamily = fonts.ascii || fonts.eastAsia || fonts.hAnsi || fonts.cs;
+      const fontFamily = fonts.ascii ?? fonts.eastAsia ?? fonts.hAnsi ?? fonts.cs;
       if (fontFamily && typeof fontFamily === 'string') {
         css['font-family'] = `"${fontFamily}", sans-serif`;
       }
@@ -350,7 +350,7 @@ export class StyleExtractor {
     const sizeElements = ['w:sz', 'w:szCs'];
     for (const element of sizeElements) {
       if (rPr[element]) {
-        const sizeValue = rPr[element].val || rPr[element];
+        const sizeValue = rPr[element].val ?? rPr[element];
         if (sizeValue && !isNaN(parseInt(sizeValue))) {
           const size = parseInt(sizeValue) / 2;
           if (size > 0 && size <= 72) {
@@ -369,8 +369,8 @@ export class StyleExtractor {
     if (!rPr['w:color']) return;
 
     const colorElement = rPr['w:color'];
-    const colorValue = colorElement.val || colorElement['w:val'] || colorElement;
-    const themeColor = colorElement.themeColor || colorElement['w:themeColor'];
+    const colorValue = colorElement.val ?? colorElement['w:val'] ?? colorElement;
+        const themeColor = colorElement.themeColor ?? colorElement['w:themeColor'];
 
     if (themeColor && typeof themeColor === 'string') {
       css['color'] = this.convertThemeColor(themeColor);
@@ -387,7 +387,7 @@ export class StyleExtractor {
    */
   private parseRunBackground(rPr: any, css: Record<string, string>): void {
     if (rPr['w:highlight']) {
-      const highlightValue = rPr['w:highlight'].val || rPr['w:highlight'];
+      const highlightValue = rPr['w:highlight'].val ?? rPr['w:highlight'];
       if (highlightValue && typeof highlightValue === 'string') {
         css['background-color'] = this.convertHighlightColor(highlightValue);
       }
@@ -409,7 +409,7 @@ export class StyleExtractor {
    * 解析阴影填充颜色
    */
   private parseShadingFill(shading: any, css: Record<string, string>): void {
-    const fillColor = shading.fill || shading['w:fill'];
+    const fillColor = shading.fill ?? shading['w:fill'];
     if (
       fillColor &&
       typeof fillColor === 'string' &&
@@ -429,7 +429,7 @@ export class StyleExtractor {
   private parseShadingForeground(shading: any, css: Record<string, string>): void {
     if (css['color']) return;
 
-    const fgColor = shading.color || shading['w:color'];
+    const fgColor = shading.color ?? shading['w:color'];
     if (fgColor && typeof fgColor === 'string' && fgColor !== 'auto') {
       const cleanColor = fgColor.replace(/[^0-9A-Fa-f]/g, '').toUpperCase();
       if (cleanColor.length === 6) {
@@ -446,7 +446,7 @@ export class StyleExtractor {
     if (rPr['w:i']) css['font-style'] = 'italic';
     
     if (rPr['w:u']) {
-      const underline = rPr['w:u'].val || rPr['w:u'];
+      const underline = rPr['w:u'].val ?? rPr['w:u'];
       css['text-decoration'] = underline === 'none' ? 'none' : 'underline';
     }
     
@@ -461,7 +461,7 @@ export class StyleExtractor {
   private parseRunAlignment(rPr: any, css: Record<string, string>): void {
     if (!rPr['w:vertAlign']) return;
 
-    const vertAlign = rPr['w:vertAlign'].val || rPr['w:vertAlign'];
+    const vertAlign = rPr['w:vertAlign'].val ?? rPr['w:vertAlign'];
     if (vertAlign === 'superscript') {
       css['vertical-align'] = 'super';
       css['font-size'] = '0.8em';
@@ -476,7 +476,7 @@ export class StyleExtractor {
    */
   private parseRunSpacing(rPr: any, css: Record<string, string>): void {
     if (rPr['w:spacing']) {
-      const spacingValue = rPr['w:spacing'].val || rPr['w:spacing'];
+      const spacingValue = rPr['w:spacing'].val ?? rPr['w:spacing'];
       if (spacingValue && !isNaN(parseInt(spacingValue))) {
         const spacing = parseInt(spacingValue);
         css['letter-spacing'] = spacing / 20 + 'pt';
@@ -523,7 +523,7 @@ export class StyleExtractor {
   private parseTableAlignment(tblPr: any, css: Record<string, string>): void {
     if (!tblPr['w:jc']) return;
 
-    const alignmentValue = tblPr['w:jc'].val || tblPr['w:jc'];
+    const alignmentValue = tblPr['w:jc'].val ?? tblPr['w:jc'];
     if (alignmentValue && typeof alignmentValue === 'string') {
       css['margin-left'] = alignmentValue === 'center' ? 'auto' : '0';
       css['margin-right'] = alignmentValue === 'center' ? 'auto' : '0';
@@ -557,7 +557,7 @@ export class StyleExtractor {
         const border = borders[wordSide];
         const width =
           border.sz && !isNaN(parseInt(border.sz)) ? parseInt(border.sz) / 8 + 'pt' : '1pt';
-        const style = this.convertBorderStyle(border.val || 'single');
+        const style = this.convertBorderStyle(border.val ?? 'single');
         let color = '#000000';
 
         if (border.color && typeof border.color === 'string' && border.color !== 'auto') {
@@ -693,7 +693,7 @@ export class StyleExtractor {
 
       // 样式引用
       if (pPr['w:pStyle']) {
-        styleId = pPr['w:pStyle'].val || pPr['w:pStyle'];
+        styleId = pPr['w:pStyle'].val ?? pPr['w:pStyle'];
       }
 
       // 直接格式化
@@ -735,7 +735,7 @@ export class StyleExtractor {
 
       // 样式引用
       if (rPr['w:rStyle']) {
-        styleId = rPr['w:rStyle'].val || rPr['w:rStyle'];
+        styleId = rPr['w:rStyle'].val ?? rPr['w:rStyle'];
       }
 
       // 直接格式化
@@ -764,7 +764,7 @@ export class StyleExtractor {
 
       // 样式引用
       if (tblPr['w:tblStyle']) {
-        styleId = tblPr['w:tblStyle'].val || tblPr['w:tblStyle'];
+        styleId = tblPr['w:tblStyle'].val ?? tblPr['w:tblStyle'];
       }
 
       // 直接格式化
@@ -796,7 +796,7 @@ export class StyleExtractor {
           : [fontData['w:fonts']['w:font']];
 
         for (const font of fonts) {
-          const name = font.$.name || font.$['w:name'];
+          const name = font.$.name ?? font.$['w:name'];
           if (name) {
             this.fonts.set(name, font);
           }
@@ -997,7 +997,7 @@ td, th {
       lightGray: '#C0C0C0',
       black: '#000000',
     };
-    return colorMap[color] || '#FFFF00';
+    return colorMap[color] ?? '#FFFF00';
   }
 
   /**
@@ -1023,7 +1023,7 @@ td, th {
       background2: '#EEECE1',
     };
 
-    return themeColorMap[themeColor] || '#000000';
+    return themeColorMap[themeColor] ?? '#000000';
   }
 
   private convertBorderStyle(style: string): string {

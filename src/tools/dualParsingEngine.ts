@@ -488,7 +488,7 @@ ${processedHtml}
         }
 
         // 提取图片文件名
-        const imageName = src.split('/').pop() || '';
+        const imageName = src.split('/').pop() ?? '';
         const mediaFile = mediaMap.get(imageName);
 
         if (
@@ -627,11 +627,11 @@ ${processedHtml}
     
     if (this.options.debugOptions?.logProgress) {
       console.log('🔍 CSS生成结果分析:', {
-        baseStylesLength: cssResult.baseStyles?.length || 0,
-        customStylesLength: cssResult.customStyles?.length || 0,
-        responsiveStylesLength: cssResult.responsiveStyles?.length || 0,
-        printStylesLength: cssResult.printStyles?.length || 0,
-        completeLength: cssResult.complete?.length || 0,
+        baseStylesLength: cssResult.baseStyles?.length ?? 0,
+        customStylesLength: cssResult.customStyles?.length ?? 0,
+        responsiveStylesLength: cssResult.responsiveStyles?.length ?? 0,
+        printStylesLength: cssResult.printStyles?.length ?? 0,
+        completeLength: cssResult.complete?.length ?? 0,
       });
     }
     
@@ -1019,7 +1019,7 @@ ${processedHtml}
           styleId: styleId,
           name: extractedStyle.name,
           type: 'paragraph',
-          css: extractedStyle.properties || {},
+          css: extractedStyle.properties ?? {},
           mammothMapping: {
             selector: `p[style-name='${extractedStyle.name}']`,
             element: 'p',
@@ -1129,7 +1129,7 @@ ${processedHtml}
       italic: 'font-style',
     };
 
-    return propertyMap[wordProperty] || null;
+    return propertyMap[wordProperty] ?? null;
   }
 
   /**
@@ -1214,7 +1214,7 @@ ${processedHtml}
       const content = this.documentConverter.createDockerIntroContent();
       const options: ConversionOptions = {
         format,
-        outputPath: outputPath || `docker_intro.${format}`,
+        outputPath: outputPath ?? `docker_intro.${format}`,
         styling: {
           colors: {
             primary: '#0066cc',
@@ -1259,7 +1259,7 @@ ${processedHtml}
       const conversionOptions: ConversionOptions = {
         format,
         outputPath:
-          options?.outputPath || `${title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, '_')}.${format}`,
+          options?.outputPath ?? `${title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, '_')}.${format}`,
         styling: {
           colors: {
             primary: '#0066cc',

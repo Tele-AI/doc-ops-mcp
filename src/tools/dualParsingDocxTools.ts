@@ -264,7 +264,7 @@ export async function dualParsingDocxToHtml(args: any): Promise<any> {
     const result: DualParsingResult = await engine.convertDocxToHtml(validatedDocxPath);
 
     if (!result.success) {
-      throw new Error(result.error || 'Conversion failed');
+      throw new Error(result.error ?? 'Conversion failed');
     }
 
     console.log('✅ Dual parsing conversion completed!');
@@ -280,11 +280,11 @@ export async function dualParsingDocxToHtml(args: any): Promise<any> {
     });
 
     // Generate output paths
-    const htmlOutputPath = validatedOutputPath || validatedDocxPath.replace(/\.docx$/i, '_converted.html');
-    const cssPath = validatedCssOutputPath || validatedDocxPath.replace(/\.docx$/i, '_styles.css');
+    const htmlOutputPath = validatedOutputPath ?? validatedDocxPath.replace(/\.docx$/i, '_converted.html');
+    const cssPath = validatedCssOutputPath ?? validatedDocxPath.replace(/\.docx$/i, '_styles.css');
 
     // Save HTML file
-    const htmlToSave = result.completeHTML || result.html;
+    const htmlToSave = result.completeHTML ?? result.html;
     await fs.writeFile(htmlOutputPath, htmlToSave, 'utf8');
     console.log('💾 HTML file saved:', htmlOutputPath);
 
@@ -380,7 +380,7 @@ export async function dualParsingDocxToPdf(args: any): Promise<any> {
     }
 
     // Generate PDF output path
-    const pdfOutputPath = validatedOutputPath || validatedDocxPath.replace(/\.docx$/i, '_converted.pdf');
+    const pdfOutputPath = validatedOutputPath ?? validatedDocxPath.replace(/\.docx$/i, '_converted.pdf');
 
     // Build playwright-mcp commands
     const playwrightCommands = [
@@ -430,8 +430,8 @@ Dual Parsing DOCX to PDF - Hybrid Mode Workflow
       mcpCommands: playwrightCommands,
       stats: htmlResult.stats,
       pdfOptions: {
-        format: options.pdfOptions?.format || 'A4',
-        margin: options.pdfOptions?.margin || '1in',
+        format: options.pdfOptions?.format ?? 'A4',
+      margin: options.pdfOptions?.margin ?? '1in',
         printBackground: options.pdfOptions?.printBackground !== false,
         landscape: options.pdfOptions?.landscape === true,
       },

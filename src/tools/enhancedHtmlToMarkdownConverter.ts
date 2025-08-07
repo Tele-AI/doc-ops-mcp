@@ -118,7 +118,7 @@ class EnhancedHtmlToMarkdownConverter {
         metadata: {
           originalFormat: 'html',
           targetFormat: 'markdown',
-          stylesPreserved: this.options.preserveStyles || false,
+          stylesPreserved: this.options.preserveStyles ?? false,
           contentLength: markdownContent.length,
           converter: 'enhanced-html-to-markdown-converter',
         },
@@ -191,13 +191,14 @@ class EnhancedHtmlToMarkdownConverter {
     $('img').each((i: number, img: any) => {
       const $img = $(img);
       const src = $img.attr('src');
-      const alt = $img.attr('alt') || 'Image';
-      const title = $img.attr('title') || '';
+      const alt = $img.attr('alt') ?? 'Image';
+      const title = $img.attr('title') ?? '';
       const dataOriginalPath = $img.attr('data-original-path');
 
       if (src || dataOriginalPath) {
-        const imagePath = dataOriginalPath || src;
-        let finalPath = src || imagePath;
+        const imagePath = dataOriginalPath ?? src;
+
+      let finalPath = src ?? imagePath;
 
         // 确保图片路径正确
         if (
@@ -320,7 +321,7 @@ class EnhancedHtmlToMarkdownConverter {
     const codeElement = element.find('code').first();
     let language = '';
     if (codeElement.length > 0) {
-      const className = codeElement.attr('class') || '';
+      const className = codeElement.attr('class') ?? '';
       const languageMatch = className.match(/language-([\w-]+)/);
       if (languageMatch) {
         language = languageMatch[1];
@@ -336,8 +337,8 @@ class EnhancedHtmlToMarkdownConverter {
 
   private convertImageToMarkdown(element: any): string {
     const src = element.attr('src');
-    const alt = element.attr('alt') || 'Image';
-    const title = element.attr('title') || '';
+    const alt = element.attr('alt') ?? 'Image';
+        const title = element.attr('title') ?? '';
     const dataOriginalPath = element.attr('data-original-path');
 
     const imagePath = dataOriginalPath || src;
@@ -470,8 +471,8 @@ class EnhancedHtmlToMarkdownConverter {
 
   private processInlineImage($node: any): string {
     const src = $node.attr('src');
-    const alt = $node.attr('alt') || 'Image';
-    const title = $node.attr('title') || '';
+    const alt = $node.attr('alt') ?? 'Image';
+      const title = $node.attr('title') ?? '';
     const dataOriginalPath = $node.attr('data-original-path');
 
     const imagePath = dataOriginalPath || src;
@@ -498,13 +499,13 @@ class EnhancedHtmlToMarkdownConverter {
     imgElement.each((j: number, img: any) => {
       const $img = $(img);
       const imgSrc = $img.attr('src');
-      const imgAlt = $img.attr('alt') || 'Image';
-      const imgTitle = $img.attr('title') || '';
+      const imgAlt = $img.attr('alt') ?? 'Image';
+      const imgTitle = $img.attr('title') ?? '';
       const imgDataOriginalPath = $img.attr('data-original-path');
-      const imgImagePath = imgDataOriginalPath || imgSrc;
+      const imgImagePath = imgDataOriginalPath ?? imgSrc;
 
       if (imgImagePath) {
-        let imgFinalPath = imgSrc || imgImagePath;
+        let imgFinalPath = imgSrc ?? imgImagePath;
         if (!imgFinalPath.startsWith('./') && !imgFinalPath.startsWith('/')) {
           imgFinalPath = `./${imgFinalPath}`;
         }

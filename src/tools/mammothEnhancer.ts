@@ -261,8 +261,8 @@ export class MammothEnhancer {
 
           return {
             src: dataUrl,
-            alt: image.altText || 'Document Image',
-            title: image.title || '',
+            alt: image.altText ?? 'Document Image',
+        title: image.title ?? '',
           };
         } else if (options.imageOutputDir) {
           // 导入安全配置函数
@@ -280,8 +280,8 @@ export class MammothEnhancer {
 
           return {
             src: relativePath, // HTML中使用相对路径
-            alt: image.altText || 'Document Image',
-            title: image.title || '',
+            alt: image.altText ?? 'Document Image',
+        title: image.title ?? '',
             'data-original-path': imagePath, // 保存原始路径作为数据属性
           };
         } else {
@@ -291,8 +291,8 @@ export class MammothEnhancer {
 
           return {
             src: placeholderPath,
-            alt: image.altText || 'Document Image',
-            title: image.title || '',
+            alt: image.altText ?? 'Document Image',
+        title: image.title ?? '',
             'data-image-buffer': imageBuffer, // 保存图片数据用于后续处理
             'data-content-type': image.contentType,
           };
@@ -310,7 +310,7 @@ export class MammothEnhancer {
       if (element.alignment || element.styleName) {
         return {
           ...element,
-          styleName: element.styleName || 'Normal',
+          styleName: element.styleName ?? 'Normal',
         };
       }
       return element;
@@ -390,7 +390,7 @@ export class MammothEnhancer {
     return html.replace(/<table([^>]*)>([\s\S]*?)<\/table>/g, (match, attrs, content) => {
       // 如果没有 tbody，添加它
       if (!content.includes('<tbody>')) {
-        const rows = content.match(/<tr[^>]*>[\s\S]*?<\/tr>/g) || [];
+        const rows = content.match(/<tr[^>]*>[\s\S]*?<\/tr>/g) ?? [];
         if (rows.length > 0) {
           content = `<tbody>${rows.join('')}</tbody>`;
         }
@@ -603,7 +603,7 @@ export class MammothEnhancer {
       'image/svg+xml': 'svg',
     };
 
-    return typeMap[contentType] || 'png';
+    return typeMap[contentType] ?? 'png';
   }
 
   /**

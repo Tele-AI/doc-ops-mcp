@@ -599,8 +599,8 @@ class MarkdownToHtmlConverter {
         metadata: {
           originalFormat: 'markdown',
           targetFormat: 'html',
-          stylesPreserved: this.options.preserveStyles || false,
-          theme: this.options.theme || 'default',
+          stylesPreserved: this.options.preserveStyles ?? false,
+      theme: this.options.theme ?? 'default',
           converter: 'markdown-to-html-converter',
           contentLength: completeHtml.length,
           ...stats,
@@ -657,9 +657,9 @@ class MarkdownToHtmlConverter {
       return content;
     }
 
-    const theme = this.options.theme || 'default';
-    const themeCSS = this.themes.get(theme) || this.themes.get('default')!;
-    const customCSS = this.options.customCSS || '';
+    const theme = this.options.theme ?? 'default';
+    const themeCSS = this.themes.get(theme) ?? this.themes.get('default')!;
+    const customCSS = this.options.customCSS ?? '';
 
     // 生成目录（如果启用）
     let tocHtml = '';
@@ -702,7 +702,7 @@ ${content}
       const $heading = $(element);
       const level = parseInt(element.tagName.substring(1));
       const text = $heading.text();
-      const id = $heading.attr('id') || text.toLowerCase().replace(/[^\w]+/g, '-');
+      const id = $heading.attr('id') ?? text.toLowerCase().replace(/[^\w]+/g, '-');
 
       const indent = '  '.repeat(level - 1);
       toc += `${indent}<li><a href="#${id}">${text}</a></li>\n`;

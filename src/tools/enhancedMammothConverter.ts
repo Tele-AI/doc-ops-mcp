@@ -242,7 +242,7 @@ class EnhancedMammothConverter {
    */
   private processAlignment(align: string, styleObj: any) {
     const alignMap = { left: 'left', center: 'center', right: 'right', both: 'justify' };
-    this.setStyleProperty(styleObj, 'textAlign', alignMap[align] || 'left');
+    this.setStyleProperty(styleObj, 'textAlign', alignMap[align] ?? 'left');
   }
 
   /**
@@ -287,7 +287,7 @@ class EnhancedMammothConverter {
    * 处理字体属性
    */
   private processFontFamily(fonts: any, styleObj: any) {
-    const fontFamily = `"${fonts.ascii || fonts.hAnsi || 'Calibri'}", sans-serif`;
+    const fontFamily = `"${fonts.ascii ?? fonts.hAnsi ?? 'Calibri'}", sans-serif`;
     this.setStyleProperty(styleObj, 'fontFamily', fontFamily);
   }
 
@@ -602,7 +602,7 @@ class EnhancedMammothConverter {
               return image.read('base64').then(function (imageBuffer) {
                 return {
                   src: `data:${image.contentType};base64,${imageBuffer}`,
-                  alt: image.altText || 'Document Image',
+                  alt: image.altText ?? 'Document Image',
                 };
               });
             })
@@ -744,7 +744,7 @@ class EnhancedMammothConverter {
         continue;
       }
 
-      const styleName = styleData.name || styleId;
+      const styleName = styleData.name ?? styleId;
       const className = this.sanitizeClassName(styleId);
 
       if (styleData.type === 'paragraph') {
@@ -1021,7 +1021,7 @@ a:visited {
       bmp: 'image/bmp',
       svg: 'image/svg+xml',
     };
-    return typeMap[ext] || 'image/png';
+    return typeMap[ext] ?? 'image/png';
   }
 
   generateCssRule(selector, styles) {

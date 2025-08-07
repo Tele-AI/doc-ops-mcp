@@ -253,7 +253,7 @@ class EnhancedHtmlToDocxConverter {
   }
 
   private createDocxElement(element: ParsedElement, $: any): any {
-    const baseStyle = this.styleMap.get(element.tag) || {};
+    const baseStyle = this.styleMap.get(element.tag) ?? {};
     const customStyle = this.convertCssToDocx(element.styles);
     const finalStyle = { ...baseStyle, ...customStyle };
 
@@ -266,7 +266,7 @@ class EnhancedHtmlToDocxConverter {
       case 'h6':
         return new Paragraph({
           heading: finalStyle.heading,
-          alignment: finalStyle.alignment || AlignmentType.LEFT,
+          alignment: finalStyle.alignment ?? AlignmentType.LEFT,
           spacing: {
             before: 480, // 标题前间距
             after: 240, // 标题后间距
@@ -278,7 +278,7 @@ class EnhancedHtmlToDocxConverter {
               text: element.text,
               bold: finalStyle.bold !== false, // 默认粗体
               size: finalStyle.size,
-              color: finalStyle.color || '2c3e50',
+              color: finalStyle.color ?? '2c3e50',
               italics: finalStyle.italics,
               font: {
                 name: 'Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Microsoft YaHei, SimHei, Arial, sans-serif',
@@ -289,7 +289,7 @@ class EnhancedHtmlToDocxConverter {
 
       case 'p':
         return new Paragraph({
-          alignment: finalStyle.alignment || AlignmentType.LEFT,
+          alignment: finalStyle.alignment ?? AlignmentType.LEFT,
           spacing: {
             line: 360, // 1.5倍行距
             lineRule: 'auto',
@@ -304,7 +304,7 @@ class EnhancedHtmlToDocxConverter {
 
       case 'blockquote':
         return new Paragraph({
-          alignment: finalStyle.alignment || AlignmentType.LEFT,
+          alignment: finalStyle.alignment ?? AlignmentType.LEFT,
           spacing: {
             line: 360,
             lineRule: 'auto',
@@ -326,8 +326,8 @@ class EnhancedHtmlToDocxConverter {
             new TextRun({
               text: element.text,
               italics: true,
-              size: finalStyle.size || 22,
-              color: finalStyle.color || '5a6c7d',
+              size: finalStyle.size ?? 22,
+            color: finalStyle.color ?? '5a6c7d',
               font: {
                 name: 'Segoe UI Emoji, Apple Color Emoji, Noto Color Emoji, Microsoft YaHei, SimHei, Arial, sans-serif',
               },
@@ -587,7 +587,7 @@ class EnhancedHtmlToDocxConverter {
         new Paragraph({
           children: [
             new TextRun({
-              text: decodedLine || ' ', // 空行用空格代替
+              text: decodedLine ?? ' ', // 空行用空格代替
               font: {
                 name: 'Consolas',
               },
@@ -691,7 +691,7 @@ class EnhancedHtmlToDocxConverter {
       '#000000': 'black',
       '#ffffff': 'white'
     };
-    return highlightMap[bgColor.toLowerCase()] || 'yellow';
+    return highlightMap[bgColor.toLowerCase()] ?? 'yellow';
   }
 
   private convertFontWeight(styles: any, docxStyle: StyleMapping): void {
@@ -841,7 +841,7 @@ class EnhancedHtmlToDocxConverter {
       darkgrey: 'A9A9A9',
     };
 
-    return colorMap[value.toLowerCase()] || null;
+    return colorMap[value.toLowerCase()] ?? null;
   }
 
   private hslToRgb(h: number, s: number, l: number): number[] {

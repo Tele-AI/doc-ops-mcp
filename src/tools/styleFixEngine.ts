@@ -112,7 +112,7 @@ export class StyleFixEngine {
           : [stylesData['w:styles']['w:style']];
 
         for (const style of styles) {
-          const styleId = style.styleId || style['w:styleId'];
+          const styleId = style.styleId ?? style['w:styleId'];
           if (styleId) {
             this.docxStyles.set(styleId, style);
             this.log(`  发现样式: ${styleId}`);
@@ -142,7 +142,7 @@ export class StyleFixEngine {
             return image.read('base64').then((imageBuffer: string) => {
               return {
                 src: `data:${image.contentType};base64,${imageBuffer}`,
-                alt: image.altText || 'Document Image',
+                alt: image.altText ?? 'Document Image',
               };
             });
           })
@@ -242,7 +242,7 @@ export class StyleFixEngine {
     // 为每个提取的样式创建映射
     for (const [styleId, styleData] of this.docxStyles) {
       const className = this.sanitizeClassName(styleId);
-      const styleName = styleData['w:name']?.[0]?.val || styleId;
+      const styleName = styleData['w:name']?.[0]?.val ?? styleId;
 
       if (styleData.type === 'paragraph') {
         styleMap.push(`p[style-name='${styleName}'] => p.${className}:fresh`);
@@ -300,7 +300,7 @@ ${html}
    * 生成Word样式CSS
    */
   private generateWordStylesCSS(): string {
-    const fontFamily = this.options.customFontFamily || 'Microsoft YaHei';
+    const fontFamily = this.options.customFontFamily ?? 'Microsoft YaHei';
 
     return `
 /* ===== Word样式修复 - 强制应用 ===== */

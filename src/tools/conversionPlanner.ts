@@ -344,12 +344,12 @@ class ConversionPlanner {
 
     switch (toolName) {
       case 'convert_markdown_to_html':
-        params.theme = request.requirements?.theme || 'github';
+        params.theme = request.requirements?.theme ?? 'github';
         params.includeTableOfContents = false;
         break;
 
       case 'convert_markdown_to_docx':
-        params.theme = request.requirements?.theme || 'professional';
+        params.theme = request.requirements?.theme ?? 'professional';
         params.preserveStyles = request.requirements?.preserveStyles !== false;
         break;
 
@@ -394,7 +394,7 @@ class ConversionPlanner {
       convert_document: 'inputPath',
     };
 
-    return mappings[toolName] || 'inputPath';
+    return mappings[toolName] ?? 'inputPath';
   }
 
   /**
@@ -410,7 +410,7 @@ class ConversionPlanner {
       convert_document: this.getConvertDocumentDescription(fromFormat, toFormat),
     };
 
-    return descriptions[toolName] || `转换 ${fromFormat} 到 ${toFormat}`;
+    return descriptions[toolName] ?? `转换 ${fromFormat} 到 ${toFormat}`;
   }
 
   /**
@@ -457,7 +457,7 @@ class ConversionPlanner {
       },
     };
 
-    return timeMappings[fromFormat]?.[toFormat] || '10-30秒';
+    return timeMappings[fromFormat]?.[toFormat] ?? '10-30秒';
   }
 
   /**

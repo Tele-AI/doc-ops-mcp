@@ -70,10 +70,10 @@ export function createEnhancedMammothConfig() {
     convertImage: mammoth.images.imgElement(function (image) {
       // 图片处理 - 转换为 base64 或保存到文件
       return image.read('base64').then(function (imageBuffer) {
-        const extension = image.contentType.split('/')[1] || 'png';
+        const extension = image.contentType.split('/')[1] ?? 'png';
         return {
           src: `data:${image.contentType};base64,${imageBuffer}`,
-          alt: image.altText || 'Document Image',
+          alt: image.altText ?? 'Document Image',
         };
       });
     }),
@@ -93,7 +93,7 @@ export function createEnhancedMammothConfig() {
       if (element.alignment) {
         return {
           ...element,
-          styleName: element.styleName || 'Normal',
+          styleName: element.styleName ?? 'Normal',
         };
       }
       return element;
@@ -115,13 +115,13 @@ export async function convertDocxToHtmlWithStyles(inputPath: string, options: an
       // 导入安全配置函数
       const { safePathJoin, validateAndSanitizePath } = require('../security/securityConfig');
       
-      const rawImageDir = options.imageOutputDir || safePathJoin(process.cwd(), 'output', 'images');
+      const rawImageDir = options.imageOutputDir ?? safePathJoin(process.cwd(), 'output', 'images');
       const imageDir = validateAndSanitizePath(rawImageDir, [process.cwd()]);
       await fs.mkdir(imageDir, { recursive: true });
 
       config.convertImage = mammoth.images.imgElement(function (image) {
         return image.read().then(async function (imageBuffer) {
-          const extension = image.contentType.split('/')[1] || 'png';
+          const extension = image.contentType.split('/')[1] ?? 'png';
           const randomId = crypto.randomBytes(4).toString('hex');
           const filename = `image_${Date.now()}_${randomId}.${extension}`;
           const rawImagePath = safePathJoin(imageDir, filename);
@@ -132,7 +132,7 @@ export async function convertDocxToHtmlWithStyles(inputPath: string, options: an
 
           return {
             src: imagePath,
-            alt: image.altText || 'Document Image',
+            alt: image.altText ?? 'Document Image',
           };
         });
       });
@@ -409,7 +409,7 @@ export async function analyzeDocxStyles(inputPath: string) {
       // 添加样式分析
       transformDocument: mammoth.transforms.paragraph(function (element) {
         console.error(
-          `段落样式: ${element.styleName || 'Default'}, 对齐: ${element.alignment || 'left'}`
+          `段落样式: ${element.styleName ?? 'Default'}, 对齐: ${element.alignment ?? 'left'}`
         );
         return element;
       }),

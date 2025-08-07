@@ -9,7 +9,7 @@ export class SafeErrorHandler {
     }
     
     // 生产环境：移除敏感信息
-    let message = error.message || 'An error occurred';
+    let message = error.message ?? 'An error occurred';
     
     // 移除文件路径
     message = message.replace(/\/[^\s]+/g, '[path]');

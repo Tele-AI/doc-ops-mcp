@@ -185,10 +185,10 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
       });
 
       if (!result.success) {
-        throw new Error(result.error || 'HTML到Markdown转换失败');
+        throw new Error(result.error ?? 'HTML到Markdown转换失败');
       }
 
-      const markdownContent = result.content || '';
+      const markdownContent = result.content ?? '';
 
       // 导入安全配置函数
       const { validateAndSanitizePath } = require('../security/securityConfig');
@@ -420,7 +420,7 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
         const codeElement = element.find('code').first();
         let language = '';
         if (codeElement.length > 0) {
-          const className = codeElement.attr('class') || '';
+          const className = codeElement.attr('class') ?? '';
           const languageMatch = className.match(/language-([\w-]+)/);
           if (languageMatch) {
             language = languageMatch[1];
@@ -432,7 +432,7 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
         return href ? `[${text}](${href})` : text;
       case 'img':
         const src = element.attr('src');
-        const alt = element.attr('alt') || 'Image';
+        const alt = element.attr('alt') ?? 'Image';
         return src ? `![${alt}](${src})\n\n` : '';
       case 'ul':
         let ulMarkdown = '';
@@ -629,7 +629,7 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
     // 设置缩进
     if (elementStyles.paddingLeft || elementStyles.marginLeft) {
       paragraphConfig.indent = {
-        left: elementStyles.paddingLeft || elementStyles.marginLeft || 0,
+        left: elementStyles.paddingLeft ?? elementStyles.marginLeft ?? 0,
       };
     }
 
@@ -706,9 +706,9 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
       new TextRun({
         text: text,
         bold: true,
-        size: elementStyles.fontSize || baseFontSize * sizeMultiplier,
-        font: elementStyles.fontFamily || baseFontFamily,
-        color: elementStyles.color || '000000',
+        size: elementStyles.fontSize ?? baseFontSize * sizeMultiplier,
+      font: elementStyles.fontFamily ?? baseFontFamily,
+      color: elementStyles.color ?? '000000',
       }),
     ];
     return new Paragraph(paragraphConfig);
@@ -777,13 +777,13 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
       paragraphConfig.children = [
         new TextRun({
           text: text,
-          size: elementStyles.fontSize || baseFontSize,
-          font: elementStyles.fontFamily || baseFontFamily,
-          color: elementStyles.color || '000000',
-          bold: elementStyles.bold || false,
-          italics: elementStyles.italic || false,
+          size: elementStyles.fontSize ?? baseFontSize,
+      font: elementStyles.fontFamily ?? baseFontFamily,
+      color: elementStyles.color ?? '000000',
+      bold: elementStyles.bold ?? false,
+      italics: elementStyles.italic ?? false,
           underline: elementStyles.underline ? {} : undefined,
-          strike: elementStyles.strikethrough || false,
+          strike: elementStyles.strikethrough ?? false,
         }),
       ];
       return new Paragraph(paragraphConfig);
@@ -868,8 +868,8 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
   private createTextRunConfig(text: string, styles: any, tagName: string, baseFontSize: number, baseFontFamily: string): any {
     const textRunConfig: any = {
       text: text,
-      size: styles.fontSize || baseFontSize,
-      font: styles.fontFamily || baseFontFamily,
+      size: styles.fontSize ?? baseFontSize,
+      font: styles.fontFamily ?? baseFontFamily,
     };
 
     this.applyTextRunStyles(textRunConfig, styles, tagName);
@@ -914,8 +914,8 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
       const styles = this.parseElementStyles(element);
       const textRunConfig: any = {
         text: text,
-        size: styles.fontSize || baseFontSize,
-        font: styles.fontFamily || baseFontFamily,
+        size: styles.fontSize ?? baseFontSize,
+      font: styles.fontFamily ?? baseFontFamily,
       };
 
       this.applyFallbackStyles(textRunConfig, styles);
@@ -1186,7 +1186,7 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
     if (!match) return null;
 
     const size = parseFloat(match[1]);
-    const unit = match[2] || 'px';
+    const unit = match[2] ?? 'px';
 
     switch (unit) {
       case 'pt':
@@ -1235,7 +1235,7 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
       grey: '808080',
     };
 
-    return colorMap[value.toLowerCase()] || null;
+    return colorMap[value.toLowerCase()] ?? null;
   }
 
   /**
@@ -1246,7 +1246,7 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
     if (!match) return null;
 
     const size = parseFloat(match[1]);
-    const unit = match[2] || 'px';
+    const unit = match[2] ?? 'px';
 
     switch (unit) {
       case 'pt':
@@ -1309,13 +1309,13 @@ export async function convertHtmlToMarkdown(
       preserveStyles: true,
       includeCSS: false,
       outputPath: options.outputPath,
-      debug: options.debug || false,
+      debug: options.debug ?? false,
     });
 
     if (!result.success) {
       return {
         success: false,
-        error: result.error || 'HTML到Markdown转换失败',
+        error: result.error ?? 'HTML到Markdown转换失败',
       };
     }
 
@@ -1349,7 +1349,7 @@ export async function convertHtmlToDocx(
   const converter = new HtmlConverter();
   const finalOptions = {
     ...options,
-    outputPath: outputPath || options.outputPath,
+    outputPath: outputPath ?? options.outputPath,
   };
   return await converter.convertHtmlToDocx(inputPath, finalOptions);
 }

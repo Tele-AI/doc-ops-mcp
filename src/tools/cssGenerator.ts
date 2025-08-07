@@ -374,7 +374,7 @@ export class CSSGenerator {
    * 生成选择器
    */
   private generateSelector(styleId: string, style: StyleDefinition): string {
-    const prefix = this.options.customPrefix || '';
+    const prefix = this.options.customPrefix ?? '';
     // 确保类名不以数字开头，CSS规范要求类名必须以字母、下划线或连字符开头
     const sanitizedId = /^\d/.test(styleId) ? `style-${styleId}` : styleId;
     const className = `${prefix}${sanitizedId}`;
@@ -539,7 +539,7 @@ export class CSSGenerator {
    */
   private getFontFamily(fontName: string): string {
     const cleanName = fontName.replace(/["']/g, '');
-    const fallbacks = this.options.fontFallbacks?.[cleanName] || [cleanName, 'sans-serif'];
+    const fallbacks = this.options.fontFallbacks?.[cleanName] ?? [cleanName, 'sans-serif'];
     return fallbacks.map(font => (font.includes(' ') ? `"${font}"` : font)).join(', ');
   }
 
@@ -648,7 +648,7 @@ export class CSSGenerator {
    */
   private calculateHeadingSize(level: number): string {
     const baseSizes = ['18pt', '16pt', '14pt', '12pt', '11pt', '10pt'];
-    return baseSizes[level - 1] || '10pt';
+    return baseSizes[level - 1] ?? '10pt';
   }
 
   /**
@@ -656,7 +656,7 @@ export class CSSGenerator {
    */
   private calculateMobileHeadingSize(level: number): string {
     const mobileSizes = ['16pt', '14pt', '12pt', '11pt', '10pt', '9pt'];
-    return mobileSizes[level - 1] || '9pt';
+    return mobileSizes[level - 1] ?? '9pt';
   }
 
   /**

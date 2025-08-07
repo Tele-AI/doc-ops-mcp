@@ -70,7 +70,7 @@ export class DocumentConverter {
     try {
       const styling = { ...this.defaultStyling, ...options.styling };
       const outputPath =
-        options.outputPath || this.generateOutputPath(content.title || 'document', options.format);
+        options.outputPath ?? this.generateOutputPath(content.title ?? 'document', options.format);
 
       switch (options.format) {
         case 'md':
@@ -176,7 +176,7 @@ export class DocumentConverter {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${this.escapeHtml(content.title || '文档')}</title>
+    <title>${this.escapeHtml(content.title ?? '文档')}</title>
     ${content.author ? `<meta name="author" content="${this.escapeHtml(content.author)}">` : ''}
     ${content.description ? `<meta name="description" content="${this.escapeHtml(content.description)}">` : ''}
     <style>
@@ -415,7 +415,7 @@ export class DocumentConverter {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>${content.title || 'Document'}</title>
+    <title>${content.title ?? 'Document'}</title>
     <style>
         /* 使用本地字体，避免外部资源引用的安全风险 */
         body {

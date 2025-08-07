@@ -18,7 +18,7 @@ export const defaultSecurityConfig: SecurityConfig = {
   tempFilePermissions: 0o600, // Owner read/write only
   maxTempFileAge: 3600000, // 1 hour
   allowedTempDirs: [
-    process.env.TEMP_DIR || os.tmpdir(),
+    process.env.TEMP_DIR ?? os.tmpdir(),
     '/tmp',
     path.join(process.cwd(), 'temp')
   ],
@@ -46,7 +46,7 @@ export function isAllowedTempDir(dirPath: string): boolean {
  * Create a secure temporary file path
  */
 export function createSecureTempPath(prefix: string, extension: string = '.tmp'): string {
-  const tempDir = process.env.TEMP_DIR || os.tmpdir();
+  const tempDir = process.env.TEMP_DIR ?? os.tmpdir();
   
   if (!isAllowedTempDir(tempDir)) {
     throw new Error(`Temporary directory not allowed: ${tempDir}`);
@@ -59,34 +59,51 @@ export function createSecureTempPath(prefix: string, extension: string = '.tmp')
 }
 
 /**
+ * Remove dangerous characters from path
+ */
+function sanitizePath(input: string): string {
+  // Match all control characters (0x00-0x1F and 0x7F-0x9F)
+  return input.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+}
+
+/**
+ * Check if path contains traversal attempts
+ */
+function hasPathTraversalAttempt(path: string): boolean {
+  return path.includes('..') || path.includes('\u0000');
+}
+
+/**
+ * Check if resolved path is within allowed base paths
+ */
+function isPathAllowed(resolvedPath: string, allowedBasePaths: string[]): boolean {
+  return allowedBasePaths.some(basePath => {
+    const resolvedBasePath = path.resolve(basePath);
+    return resolvedPath.startsWith(resolvedBasePath + path.sep) ||
+           resolvedPath === resolvedBasePath;
+  });
+}
+
+/**
  * Validate and sanitize file path to prevent path traversal attacks
  */
-export function validateAndSanitizePath(inputPath: string, allowedBasePaths: string[] = []): string {
+export function validateAndSanitizePath(
+  inputPath: string,
+  allowedBasePaths: string[] = []
+): string {
   if (!inputPath || typeof inputPath !== 'string') {
     throw new Error('Invalid path: path must be a non-empty string');
   }
 
-  // Remove null bytes and other dangerous characters
-  const sanitized = inputPath.replace(/[\x00-\x1f\x7f-\x9f]/g, '');
-  
-  // Resolve the path to handle .. and . components
+  const sanitized = sanitizePath(inputPath);
   const resolvedPath = path.resolve(sanitized);
-  
-  // Check for path traversal attempts
-  if (sanitized.includes('..') || sanitized.includes('\x00')) {
+
+  if (hasPathTraversalAttempt(sanitized)) {
     throw new Error('Path traversal attempt detected');
   }
   
-  // If allowed base paths are specified, ensure the resolved path is within them
-  if (allowedBasePaths.length > 0) {
-    const isAllowed = allowedBasePaths.some(basePath => {
-      const resolvedBasePath = path.resolve(basePath);
-      return resolvedPath.startsWith(resolvedBasePath + path.sep) || resolvedPath === resolvedBasePath;
-    });
-    
-    if (!isAllowed) {
-      throw new Error(`Path outside allowed directories: ${resolvedPath}`);
-    }
+  if (allowedBasePaths.length > 0 && !isPathAllowed(resolvedPath, allowedBasePaths)) {
+    throw new Error(`Path outside allowed directories: ${resolvedPath}`);
   }
   
   return resolvedPath;
