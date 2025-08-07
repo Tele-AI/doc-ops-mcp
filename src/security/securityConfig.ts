@@ -63,14 +63,14 @@ export function createSecureTempPath(prefix: string, extension: string = '.tmp')
  */
 function sanitizePath(input: string): string {
   // Match all control characters (0x00-0x1F and 0x7F-0x9F)
-  return input.replace(/[\u0000-\u001F\u007F-\u009F]/g, '');
+  return input.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
 }
 
 /**
  * Check if path contains traversal attempts
  */
 function hasPathTraversalAttempt(path: string): boolean {
-  return path.includes('..') || path.includes('\u0000');
+  return path.includes('..') || path.includes('\x00');
 }
 
 /**
