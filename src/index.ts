@@ -541,7 +541,6 @@ async function writeDocument(
 function resolveConvertOutputPath(inputPath: string, outputPath?: string): { finalOutputPath: string, inputExt: string, outputExt: string } {
   const validatedInputPath = validatePath(inputPath);
   const inputExt = path.extname(validatedInputPath).toLowerCase();
-  const allowedInputPaths = [process.cwd(), defaultResourcePaths.tempDir];
   const allowedOutputPaths = [defaultResourcePaths.outputDir, process.cwd()];
   
   const outputExt = outputPath ? path.extname(validatePath(outputPath, allowedOutputPaths)).toLowerCase() : '.html';
@@ -722,43 +721,45 @@ async function convertDocxToHtmlSpecial(inputPath: string, finalOutputPath: stri
   }
 }
 
-function applyTextReplacements(content: string, textReplacements: any[]): string {
-  let processedContent = content;
-  
-  for (const replacement of textReplacements) {
-    if (replacement.useRegex) {
-      // 防止ReDoS攻击：限制正则表达式长度和复杂度
-      if (replacement.oldText.length > 100) {
-        console.warn('正则表达式过长，跳过处理');
-        continue;
-      }
-      try {
-        const flags = replacement.preserveCase ? 'g' : 'gi';
-        const regex = new RegExp(replacement.oldText, flags);
-        processedContent = processedContent.replace(regex, replacement.newText);
-      } catch (error: any) {
-         console.warn('正则表达式无效，跳过处理:', error.message);
-         continue;
-       }
-    } else {
-      // 防止ReDoS攻击：限制搜索文本长度
-      if (replacement.oldText.length > 100) {
-        console.warn('搜索文本过长，跳过处理');
-        continue;
-      }
-      try {
-        const searchValue = replacement.preserveCase
-          ? replacement.oldText
-          : new RegExp(replacement.oldText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'); // 转义特殊字符
-        processedContent = processedContent.replace(searchValue, replacement.newText);
-      } catch (error: any) {
-         console.warn('文本替换失败，跳过处理:', error.message);
-         continue;
-       }
-    }
+function applyRegexReplacement(content: string, replacement: any): string {
+  if (replacement.oldText.length > 100) {
+    console.warn('正则表达式过长，跳过处理');
+    return content;
   }
   
-  return processedContent;
+  try {
+    const flags = replacement.preserveCase ? 'g' : 'gi';
+    const regex = new RegExp(replacement.oldText, flags);
+    return content.replace(regex, replacement.newText);
+  } catch (error: any) {
+    console.warn('正则表达式无效，跳过处理:', error.message);
+    return content;
+  }
+}
+
+function applyPlainTextReplacement(content: string, replacement: any): string {
+  if (replacement.oldText.length > 100) {
+    console.warn('搜索文本过长，跳过处理');
+    return content;
+  }
+
+  try {
+    const searchValue = replacement.preserveCase
+      ? replacement.oldText
+      : new RegExp(replacement.oldText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
+    return content.replace(searchValue, replacement.newText);
+  } catch (error: any) {
+    console.warn('文本替换失败，跳过处理:', error.message);
+    return content;
+  }
+}
+
+function applyTextReplacements(content: string, textReplacements: any[]): string {
+  return textReplacements.reduce((processedContent, replacement) => {
+    return replacement.useRegex
+      ? applyRegexReplacement(processedContent, replacement)
+      : applyPlainTextReplacement(processedContent, replacement);
+  }, content);
 }
 
 async function performGenericConversion(inputPath: string, finalOutputPath: string, options: ConvertDocumentOptions) {
