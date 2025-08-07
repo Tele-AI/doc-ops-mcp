@@ -22,10 +22,11 @@ RUN apk add --no-cache \
 # 从构建阶段复制依赖
 COPY --from=builder /app/node_modules ./node_modules
 
-# 只复制必要的运行文件，避免敏感目录
-COPY --chown=nodejs:nodejs dist/ ./dist/
-# 避免复制整个src目录，只复制必要的文件
-# COPY --chown=nodejs:nodejs src/ ./src/
+# 明确指定需要复制的文件，避免复制整个目录
+COPY --chown=nodejs:nodejs dist/index.cjs ./dist/index.cjs
+# 如果需要其他文件，可以继续添加
+# COPY --chown=nodejs:nodejs dist/other-file.js ./dist/other-file.js
+
 # 使用条件复制，避免敏感文件
 RUN mkdir -p ./resources && chown -R nodejs:nodejs ./resources
 
