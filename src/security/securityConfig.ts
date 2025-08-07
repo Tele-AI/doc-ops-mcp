@@ -62,8 +62,11 @@ export function createSecureTempPath(prefix: string, extension: string = '.tmp')
  * Remove dangerous characters from path
  */
 function sanitizePath(input: string): string {
-  // Match all control characters (0x00-0x1F and 0x7F-0x9F)
-  return input.replace(/[\x00-\x1F\x7F-\x9F]/g, '');
+  if (!input) return '';
+  // Match and remove potentially dangerous control characters
+  // Specifically targeting null bytes, line breaks, and other special control chars
+  // Excludes tab (\x09) and line feed (\x0A) which might be legitimate in some contexts
+  return input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F-\x9F]/g, '');
 }
 
 /**
@@ -95,18 +98,20 @@ export function validateAndSanitizePath(
     throw new Error('Invalid path: path must be a non-empty string');
   }
 
-  const sanitized = sanitizePath(inputPath);
-  const resolvedPath = path.resolve(sanitized);
-
-  if (hasPathTraversalAttempt(sanitized)) {
-    throw new Error('Path traversal attempt detected');
+  const sanitizedPath = sanitizePath(inputPath);
+  
+  if (hasPathTraversalAttempt(sanitizedPath)) {
+    throw new Error('Path contains traversal attempt');
   }
   
-  if (allowedBasePaths.length > 0 && !isPathAllowed(resolvedPath, allowedBasePaths)) {
-    throw new Error(`Path outside allowed directories: ${resolvedPath}`);
+  if (allowedBasePaths.length > 0) {
+    const resolvedPath = path.resolve(sanitizedPath);
+    if (!isPathAllowed(resolvedPath, allowedBasePaths)) {
+      throw new Error('Path is not in allowed directories');
+    }
   }
   
-  return resolvedPath;
+  return sanitizedPath;
 }
 
 /**
