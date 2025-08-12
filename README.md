@@ -6,7 +6,7 @@
 
 **Language / 语言**: [English](README.md) | [中文](README_zh.md)
 
-> **Document Operations MCP Server** - A universal MCP server for document processing, conversion, and automation. Handle PDF, DOCX, HTML, Markdown, TXT, and more through a unified API and toolset.
+> **Document Operations MCP Server** - A universal MCP server for document processing, conversion, and automation. Handle PDF, DOCX, HTML, Markdown, and more through a unified API and toolset.
 
 ## Table of Contents
 
@@ -65,7 +65,7 @@ The server supports environment variables for controlling output paths and PDF e
 - **`WATERMARK_IMAGE`**: Default watermark image path for PDF files
   - Automatically added to all PDF conversions
   - Supported formats: PNG, JPG
-  - If not set, no watermark will be added
+  - If not set, default text watermark "doc-ops-mcp" will be used
 - **`QR_CODE_IMAGE`**: Default QR code image path for PDF files
   - Added to PDFs only when explicitly requested (`addQrCode=true`)
   - Supported formats: PNG, JPG
@@ -302,9 +302,10 @@ When performing PDF conversion, this server will:
 | `read_document` | Read document content | `filePath`: Document path<br>`extractMetadata`: Extract metadata<br>`preserveFormatting`: Preserve formatting | None |
 | `write_document` | Write document content | `content`: Document content<br>`outputPath`: Output file path<br>`encoding`: File encoding | None |
 | `convert_document` | Smart document conversion | `inputPath`: Input file path<br>`outputPath`: Output file path<br>`preserveFormatting`: Preserve formatting<br>`useInternalPlaywright`: Use built-in Playwright | Depends on conversion type |
+| `rewrite_document` | Smart document rewriting | `inputPath`: Document path<br>`rewriteRules`: Rewrite rules list<br>`outputPath`: Output path<br>`preserveOriginalFormat`: Keep original format | None |
 
 ##### **read_document**
-Read various document formats including PDF, DOCX, DOC, TXT, HTML, MD, and more.
+Read various document formats including PDF, DOCX, DOC, HTML, MD, and more.
 
 **Parameters:**
 - `filePath` (string, required) - Document path to read
@@ -380,6 +381,75 @@ Generate conversion plan by analyzing input file and providing conversion sugges
 - `inputPath` (string, required) - Input file path
 - `outputPath` (string, optional) - Output file path
 
+##### **rewrite_document**
+📝 Smart Document Rewriting Tool - Perform content rewriting, text replacement, and format adjustment on existing documents.
+
+**Key Features:**
+- Support intelligent rewriting for multiple document formats
+- Text content replacement (supports regular expressions)
+- Format-preserving rewriting and style adjustment
+- Document structure reorganization and content optimization
+- Batch rewrite rule application
+
+**Supported Rewrite Formats:**
+- **Direct Rewriting**: MD, HTML (direct text operations)
+- **Conversion Rewriting**: DOCX → HTML → Rewrite → DOCX
+- **Smart Rewriting**: Automatically identify format and select optimal rewrite strategy
+
+**Parameters:**
+- `inputPath` (string, required) - Path to the document to be rewritten
+- `outputPath` (string, optional) - Output file path (overwrites original file if not specified)
+- `rewriteRules` (array, required) - List of rewrite rules:
+  - `type` (string) - Rewrite type: `"replace"` | `"format"` | `"structure"`
+  - `oldText` (string) - Original text to be replaced
+  - `newText` (string) - New text after replacement
+  - `useRegex` (boolean, optional) - Whether to use regular expressions, defaults to `false`
+  - `preserveCase` (boolean, optional) - Whether to preserve case, defaults to `false`
+  - `preserveFormatting` (boolean, optional) - Whether to preserve original formatting, defaults to `true`
+- `preserveOriginalFormat` (boolean, optional) - Whether to maintain original document format, defaults to `true`
+- `backupOriginal` (boolean, optional) - Whether to backup original file, defaults to `false`
+
+**Rewrite Rule Types:**
+- **replace**: Text content replacement
+  - Supports plain text and regular expression replacement
+  - Configurable case sensitivity
+- **format**: Format markup adjustment
+  - Modify Markdown markup, HTML tags, etc.
+  - Adjust document styles and layout
+- **structure**: Structure reorganization
+  - Reorganize paragraphs and sections
+  - Adjust heading levels and content order
+
+**Usage Example:**
+```json
+{
+  "inputPath": "/path/to/document.md",
+  "outputPath": "/path/to/rewritten_document.md",
+  "rewriteRules": [
+    {
+      "type": "replace",
+      "oldText": "Old Company Name",
+      "newText": "New Company Name",
+      "preserveCase": true
+    },
+    {
+      "type": "format",
+      "oldText": "## (.*)",
+      "newText": "### $1",
+      "useRegex": true
+    }
+  ],
+  "preserveOriginalFormat": true,
+  "backupOriginal": true
+}
+```
+
+**Important Notes:**
+- Rewrite operations are executed in the order of the rules list
+- When using regular expressions, ensure expression safety
+- Recommend enabling backup for important document rewrites
+- For complex format documents (like DOCX), the system will automatically select the optimal conversion path
+
 ##### **process_pdf_post_conversion**
 🔧 PDF post-processing unified tool - ⚠️ **Important**: This is a necessary follow-up step for playwright-mcp's browser_pdf_save command! When using playwright-mcp to generate PDF, you must immediately call this tool to complete final processing. Features include: 1) Automatically move PDF from playwright temporary path to target location 2) Unified watermark and QR code addition 3) Clean up temporary files. Workflow: playwright-mcp:browser_pdf_save → doc-ops-mcp:process_pdf_post_conversion
 
@@ -389,9 +459,9 @@ Generate conversion plan by analyzing input file and providing conversion sugges
 - `addWatermark` (boolean, optional) - Whether to add watermark (automatically added if WATERMARK_IMAGE environment variable is set), defaults to `false`
 - `addQrCode` (boolean, optional) - Whether to add QR code (automatically added if QR_CODE_IMAGE environment variable is set), defaults to `false`
 - `watermarkImage` (string, optional) - Watermark image path (overrides environment variable)
-- `watermarkText` (string, optional) - Watermark text content
+- `watermarkText` (string, optional) - Watermark text content (defaults to "doc-ops-mcp" if no watermark image is provided)
 - `watermarkImageScale` (number, optional) - Watermark image scale ratio, defaults to `0.25`
-- `watermarkImageOpacity` (number, optional) - Watermark image opacity, defaults to `0.6`
+- `watermarkImageOpacity` (number, optional) - Watermark image opacity, defaults to `0.3`
 - `watermarkImagePosition` (string, optional) - Watermark image position, options: `["top-left", "top-right", "bottom-left", "bottom-right", "center"]`, defaults to `"top-right"`
 - `qrCodePath` (string, optional) - QR code image path (overrides environment variable)
 - `qrScale` (number, optional) - QR code scale ratio, defaults to `0.15`
@@ -447,21 +517,20 @@ Generate conversion plan by analyzing input file and providing conversion sugges
   - `timeout` (number) - Timeout in milliseconds
 
 ### Supported Conversions
-| From\To | PDF | DOCX | HTML | Markdown | TXT |
-|---------|----|------|------|----------|-----|
-| **PDF** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **DOCX** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **HTML** | ✅ | ❌ | ✅ | ✅ | ✅ |
-| **Markdown** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **TXT** | ✅ | ❌ | ✅ | ✅ | ✅ |
+| From\To | PDF | DOCX | HTML | Markdown |
+|---------|----|----- |------|----------|
+| **PDF** | ✅ | ❌ | ❌ | ❌ |
+| **DOCX** | ✅ | ✅ | ✅ | ✅ |
+| **HTML** | ✅ | ❌ | ✅ | ✅ |
+| **Markdown** | ✅ | ✅ | ✅ | ✅ |
 
 ## Usage Examples
 
 ```
 Convert /Users/docs/report.pdf to DOCX
-Merge file1.pdf and file2.pdf into combined.pdf
-Convert https://example.com to PDF
-Extract tables from /Users/data/report.xlsx
+Rewrite company names in /Users/docs/contract.md
+Batch replace terminology in /Users/docs/manual.docx
+Adjust heading formats in /Users/docs/article.html
 ```
 
 ## 5. Performance Metrics
@@ -474,7 +543,6 @@ Extract tables from /Users/data/report.xlsx
 | **DOCX** | 50MB | 5-10MB/s | ~File size×2 |
 | **HTML** | 50MB | 10-20MB/s | ~File size×1.2 |
 | **Markdown** | 50MB | 15-30MB/s | ~File size×1.1 |
-| **TXT** | 50MB | 50-100MB/s | ~File size×1.05 |
 
 ### Conversion Performance
 

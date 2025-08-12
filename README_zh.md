@@ -6,7 +6,7 @@
 
 **Language / 语言**: [English](README.md) | [中文](README_zh.md)
 
-> **Document Operations MCP Server** - 一个用于文档处理、转换和自动化的通用MCP服务器。通过统一的API和工具集处理PDF、DOCX、HTML、Markdown、TXT等多种格式。
+> **Document Operations MCP Server** - 一个用于文档处理、转换和自动化的通用MCP服务器。通过统一的API和工具集处理PDF、DOCX、HTML、Markdown等多种格式。
 
 ## 目录
 
@@ -67,7 +67,7 @@ bun add -g doc-ops-mcp
 - **`WATERMARK_IMAGE`**: PDF 文件的默认水印图片路径
   - 自动添加到所有 PDF 转换中
   - 支持格式：PNG、JPG
-  - 如果未设置，将不添加水印
+  - 如果未设置，将使用默认文字水印"doc-ops-mcp"
 - **`QR_CODE_IMAGE`**: PDF 文件的默认二维码图片路径
   - 仅在明确要求时添加到 PDF 中（`addQrCode=true`）
   - 支持格式：PNG、JPG
@@ -289,9 +289,10 @@ Document Operations MCP Server 采用混合架构设计，结合内部处理和�
 | `read_document` | 读取文档内容 | `filePath`: 文档路径<br>`extractMetadata`: 提取元数据<br>`preserveFormatting`: 保留格式 | 无 |
 | `write_document` | 写入文档内容 | `content`: 文档内容<br>`outputPath`: 输出文件路径<br>`encoding`: 文件编码 | 无 |
 | `convert_document` | 智能文档转换 | `inputPath`: 输入文件路径<br>`outputPath`: 输出文件路径<br>`preserveFormatting`: 保留格式<br>`useInternalPlaywright`: 使用内置Playwright | 根据转换类型 |
+| `rewrite_document` | 智能文档改写 | `inputPath`: 文档路径<br>`rewriteRules`: 改写规则列表<br>`outputPath`: 输出路径<br>`preserveOriginalFormat`: 保持原格式 | 无 |
 
 ##### **read_document**
-读取各种文档格式，包括PDF、DOCX、DOC、TXT、HTML、MD等格式。
+读取各种文档格式，包括PDF、DOCX、DOC、HTML、MD等格式。
 
 **参数：**
 - `filePath` (string, 必需) - 要读取的文档路径
@@ -367,7 +368,74 @@ HTML转Markdown。
 - `inputPath` (string, 必需) - 输入文件路径
 - `outputPath` (string, 可选) - 输出文件路径
 
+##### **rewrite_document**
+📝 智能文档改写工具 - 对现有文档进行内容改写、文本替换和格式调整。
 
+**功能特性：**
+- 支持多种文档格式的智能改写
+- 文本内容替换（支持正则表达式）
+- 格式保持改写和样式调整
+- 文档结构重组和内容优化
+- 批量改写规则应用
+
+**支持的改写格式：**
+- **直接改写**：MD、HTML（直接文本操作）
+- **转换改写**：DOCX → HTML → 改写 → DOCX
+- **智能改写**：自动识别格式并选择最佳改写策略
+
+**参数：**
+- `inputPath` (string, 必需) - 要改写的文档路径
+- `outputPath` (string, 可选) - 输出文件路径（不指定则覆盖原文件）
+- `rewriteRules` (array, 必需) - 改写规则列表：
+  - `type` (string) - 改写类型：`"replace"` | `"format"` | `"structure"`
+  - `oldText` (string) - 要替换的原文本
+  - `newText` (string) - 替换后的新文本
+  - `useRegex` (boolean, 可选) - 是否使用正则表达式，默认为`false`
+  - `preserveCase` (boolean, 可选) - 是否保持大小写，默认为`false`
+  - `preserveFormatting` (boolean, 可选) - 是否保留原格式，默认为`true`
+- `preserveOriginalFormat` (boolean, 可选) - 是否保持原始文档格式，默认为`true`
+- `backupOriginal` (boolean, 可选) - 是否备份原文件，默认为`false`
+
+**改写规则类型说明：**
+- **replace**：文本内容替换
+  - 支持普通文本和正则表达式替换
+  - 可配置大小写敏感性
+- **format**：格式标记调整
+  - 修改Markdown标记、HTML标签等
+  - 调整文档样式和排版
+- **structure**：结构重组
+  - 重新组织段落和章节
+  - 调整标题层级和内容顺序
+
+**使用示例：**
+```json
+{
+  "inputPath": "/path/to/document.md",
+  "outputPath": "/path/to/rewritten_document.md",
+  "rewriteRules": [
+    {
+      "type": "replace",
+      "oldText": "旧公司名称",
+      "newText": "新公司名称",
+      "preserveCase": true
+    },
+    {
+      "type": "format",
+      "oldText": "## (.*)",
+      "newText": "### $1",
+      "useRegex": true
+    }
+  ],
+  "preserveOriginalFormat": true,
+  "backupOriginal": true
+}
+```
+
+**注意事项：**
+- 改写操作会按照规则列表的顺序依次执行
+- 使用正则表达式时请确保表达式的安全性
+- 建议在重要文档改写前启用备份功能
+- 对于复杂格式文档（如DOCX），系统会自动选择最佳转换路径
 
 #### 网页抓取工具
 
@@ -415,21 +483,20 @@ HTML转Markdown。
   - `timeout` (number) - 超时时间（毫秒）
 
 ### 支持的格式转换
-| 从\到 | PDF | DOCX | HTML | Markdown | TXT |
-|---------|----|------|------|----------|-----|
-| **PDF** | ✅ | ❌ | ❌ | ❌ | ❌ |
-| **DOCX** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **HTML** | ✅ | ❌ | ✅ | ✅ | ✅ |
-| **Markdown** | ✅ | ✅ | ✅ | ✅ | ✅ |
-| **TXT** | ✅ | ❌ | ✅ | ✅ | ✅ |
+| 从\到 | PDF | DOCX | HTML | Markdown |
+|---------|----|----- |------|----------|
+| **PDF** | ✅ | ❌ | ❌ | ❌ |
+| **DOCX** | ✅ | ✅ | ✅ | ✅ |
+| **HTML** | ✅ | ❌ | ✅ | ✅ |
+| **Markdown** | ✅ | ✅ | ✅ | ✅ |
 
 ## 使用示例
 
 ```
 将 /Users/docs/report.pdf 转换为 DOCX
-合并 file1.pdf 和 file2.pdf 为 combined.pdf
-将 https://example.com 转换为 PDF
-从 /Users/data/report.xlsx 提取表格
+改写 /Users/docs/contract.md 中的公司名称
+批量替换 /Users/docs/manual.docx 中的术语
+调整 /Users/docs/article.html 的标题格式
 ```
 
 ## 5. 性能指标
@@ -442,7 +509,6 @@ HTML转Markdown。
 | **DOCX** | 50MB | 5-10MB/s | ~文件大小×2 |
 | **HTML** | 50MB | 10-20MB/s | ~文件大小×1.2 |
 | **Markdown** | 50MB | 15-30MB/s | ~文件大小×1.1 |
-| **TXT** | 50MB | 50-100MB/s | ~文件大小×1.05 |
 
 ### 转换性能
 
