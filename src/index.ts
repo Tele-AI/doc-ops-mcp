@@ -17,7 +17,6 @@ const fs = require('fs/promises');
 const WordExtractor = require('word-extractor');
 import * as path from 'path';
 const cheerio = require('cheerio');
-const mammoth = require('mammoth');
 const { createSecureTempPath, escapeHtml, sanitizeCssProperty, defaultSecurityConfig, validateAndSanitizePath, safePathJoin } = require('./security/securityConfig.js');
 
 // 路径安全验证函数 - 使用更安全的实现
@@ -25,9 +24,8 @@ function validatePath(inputPath: string, allowedBasePaths: string[] = []): strin
   return validateAndSanitizePath(inputPath, allowedBasePaths);
 }
 
-import { WEB_SCRAPING_TOOL, STRUCTURED_DATA_TOOL } from './tools/webScrapingTools';
-import { convertDocxToHtmlWithStyles } from './tools/enhancedMammothConfig';
-import { convertDocxToHtmlEnhanced } from './tools/enhancedMammothConverter';
+
+import { convertDocxToHtmlWithOOXML } from './tools/ooxmlParser';
 
 // 安全的HTML内容处理函数，防止XSS攻击
 function sanitizeHtmlForOutput(html: string): string {
@@ -49,13 +47,7 @@ function sanitizeHtmlForOutput(html: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#039;");
 }
-import {
-  DUAL_PARSING_TOOLS,
-  dualParsingDocxToHtml,
-  dualParsingDocxToPdf,
-  analyzeDocxStyles as analyzeDualParsingStyles,
-} from './tools/dualParsingDocxTools';
-import { optimizedDocxToPdf, optimizedDocxToMarkdown } from './tools/optimizedDocxConverter';
+
 import { convertMarkdownToHtml } from './tools/markdownToHtmlConverter';
 import { convertMarkdownToDocx } from './tools/markdownToDocxConverter';
 import {
@@ -73,7 +65,6 @@ import { ConversionPlanner } from './tools/conversionPlanner';
 // 任何格式 → PDF 的转换流程：原格式 → HTML → PDF (通过 playwright-mcp)
 export {
   convertDocxToPdf,
-  convertDocxToHtmlEnhanced,
   convertDocxToMarkdown,
   convertDocxToTxt,
   convertMarkdownToDocx,
@@ -250,43 +241,52 @@ interface QRCodeOptions {
 
 // Helper functions for readDocument
 async function processDocxWithFormatting(filePath: string, options: ReadDocumentOptions) {
-  // Using enhanced mammoth converter for style preservation
-  
-  // Try enhanced mammoth converter first
-  const enhancedResult = await tryEnhancedMammothConverter(filePath, options);
-  if (enhancedResult) {
-    return enhancedResult;
+  // 只使用OOXML解析器进行样式保留
+  const ooxmlResult = await tryCustomOOXMLParser(filePath, options);
+  if (ooxmlResult) {
+    return ooxmlResult;
   }
   
-  // Fallback to basic mammoth configuration
-  return await fallbackToBasicMammoth(filePath, options);
+  // 如果OOXML解析器失败，抛出错误
+  throw new Error('OOXML解析器处理失败，无法解析DOCX文件');
 }
 
-async function tryEnhancedMammothConverter(filePath: string, options: ReadDocumentOptions) {
+async function tryCustomOOXMLParser(filePath: string, options: ReadDocumentOptions) {
   try {
-    // Trying enhanced mammoth converter with fixes
-    const enhancedResult = await convertDocxToHtmlEnhanced(filePath, {
+    console.error('🚀 尝试自定义OOXML解析器...');
+    const ooxmlResult = await convertDocxToHtmlWithOOXML(filePath, {
       preserveImages: options.saveImages !== false,
-      enableExperimentalFeatures: true,
       debug: true,
     });
 
-    logEnhancedMammothResult(enhancedResult);
+    console.error('📊 自定义OOXML解析器结果:', {
+      success: ooxmlResult.success,
+      contentLength: ooxmlResult.content?.length ?? 0,
+      hasStyle: ooxmlResult.content?.includes('<style>') ?? false,
+      hasDoctype: ooxmlResult.content?.includes('<!DOCTYPE') ?? false,
+    });
 
-    if (enhancedResult.success && (enhancedResult as any).content) {
-      const content = (enhancedResult as any).content;
-      const metadata = (enhancedResult as any).metadata;
+    if (ooxmlResult.success && ooxmlResult.content) {
+      const content = ooxmlResult.content;
+      const metadata = ooxmlResult.metadata;
       
-      if (validateStylesInContent(content)) {
+      // 验证OOXML解析器的样式保留效果
+      if (validateOOXMLStylesInContent(content)) {
+        console.error('✅ 自定义OOXML解析器样式验证通过');
         return createSuccessfulDocxResult(content, metadata, options);
+      } else {
+        console.error('⚠️ 自定义OOXML解析器样式验证失败');
       }
     }
-  } catch (enhancedError: any) {
-    SafeErrorHandler.logError('Enhanced mammoth converter failed', enhancedError);
+  } catch (ooxmlError: any) {
+    console.error('❌ 自定义OOXML解析器失败:', ooxmlError.message);
+    SafeErrorHandler.logError('Custom OOXML parser failed', ooxmlError);
   }
   
   return null;
 }
+
+// tryEnhancedMammothConverter函数已删除，只使用OOXML解析器
 
 function logEnhancedMammothResult(enhancedResult: any) {
   // Debug output removed for production
@@ -308,6 +308,28 @@ function validateStylesInContent(content: string): boolean {
   }
 }
 
+function validateOOXMLStylesInContent(content: string): boolean {
+  // 验证OOXML解析器生成的HTML是否包含完整的样式信息
+  const hasDoctype = content.includes('<!DOCTYPE');
+  const hasStyleTag = content.includes('<style>');
+  const hasBodyContent = content.includes('<body>');
+  const hasValidCSS = content.includes('font-family') || content.includes('margin') || content.includes('padding');
+  
+  // OOXML解析器应该生成完整的HTML文档结构
+  const isValidOOXMLOutput = hasDoctype && hasStyleTag && hasBodyContent && hasValidCSS;
+  
+  console.error('🔍 OOXML样式验证:', {
+    hasDoctype,
+    hasStyleTag,
+    hasBodyContent,
+    hasValidCSS,
+    isValid: isValidOOXMLOutput,
+    contentLength: content.length
+  });
+  
+  return isValidOOXMLOutput;
+}
+
 function createSuccessfulDocxResult(content: string, metadata: any, options: ReadDocumentOptions) {
   return {
     success: true,
@@ -325,59 +347,22 @@ function createSuccessfulDocxResult(content: string, metadata: any, options: Rea
   };
 }
 
-async function fallbackToBasicMammoth(filePath: string, options: ReadDocumentOptions) {
-  console.error('🔄 回退到基础增强配置...');
-  console.error('🔄 使用基础 mammoth 配置作为回退方案...');
-  
-  const result = await convertDocxToHtmlWithStyles(filePath, {
-    saveImagesToFiles: true,
-    imageOutputDir: options.imageOutputDir ?? path.join(process.cwd(), 'output', 'images'),
-  });
-
-  console.error('🔍 回退转换结果分析:', {
-    success: result.success,
-    contentLength: result.content?.length ?? 0,
-    hasStyle: result.content?.includes('<style>') ?? false,
-    hasDoctype: result.content?.includes('<!DOCTYPE') ?? false,
-    contentPreview: (result.content?.substring(0, 300) ?? 'No content') + '...',
-  });
-
-  return {
-    success: result.success,
-    content: result.content,
-    metadata: result.metadata
-      ? {
-          ...result.metadata,
-          converter: 'enhanced-mammoth',
-          fallbackUsed: true,
-          standalone: true,
-        }
-      : {
-          format: 'html',
-          originalFormat: 'docx',
-          stylesPreserved: true,
-          converter: 'enhanced-mammoth',
-          fallbackUsed: true,
-          standalone: true,
-        },
-  };
-}
+// fallbackToBasicMammoth函数已删除，只使用OOXML解析器
 
 async function processDocxAsText(filePath: string) {
-  let result: { value: string };
-
+  // 使用WordExtractor提取纯文本
   try {
-    result = await mammoth.extractRawText({ path: filePath });
-  } catch (mammothError) {
-    SafeErrorHandler.logError('Mammoth text extraction failed', mammothError);
-    throw mammothError;
+    const extractor = new WordExtractor();
+    const extracted = await extractor.extract(filePath);
+    return {
+      success: true,
+      content: extracted.getBody(),
+      metadata: { format: 'text', originalFormat: 'docx', converter: 'word-extractor' },
+    };
+  } catch (error) {
+    SafeErrorHandler.logError('Word text extraction failed', error);
+    throw error;
   }
-
-  return {
-    success: true,
-    content: result.value,
-    metadata: { format: 'text', originalFormat: 'docx', converter: 'mammoth' },
-  };
 }
 
 async function processDocFile(filePath: string) {
@@ -682,22 +667,19 @@ async function convertDocxToHtmlSpecial(inputPath: string, finalOutputPath: stri
 
   try {
     const validatedInputPath = validatePath(inputPath);
-    const result = await convertDocxToHtmlEnhanced(validatedInputPath, {
+    
+    // 优先尝试自定义OOXML解析器
+    console.error('🚀 优先使用自定义OOXML解析器...');
+    const ooxmlResult = await convertDocxToHtmlWithOOXML(validatedInputPath, {
       preserveImages: true,
-      enableExperimentalFeatures: true,
       debug: true,
     });
 
-    console.error('📊 DOCX 转 HTML 结果:', {
-      success: result.success,
-      hasContent: !!(result as any).content,
-      contentLength: (result as any).content?.length ?? 0,
-      error: (result as any).error,
-    });
-
-    if (result.success && (result as any).content) {
+    if (ooxmlResult.success && ooxmlResult.content) {
+      console.error('✅ 自定义OOXML解析器转换成功');
+      
       // 写入HTML文件
-      await fs.writeFile(finalOutputPath, (result as any).content, 'utf-8');
+      await fs.writeFile(finalOutputPath, ooxmlResult.content, 'utf-8');
 
       return {
         success: true,
@@ -705,13 +687,14 @@ async function convertDocxToHtmlSpecial(inputPath: string, finalOutputPath: stri
         metadata: {
           originalFormat: 'docx',
           targetFormat: 'html',
-          converter: 'docx-to-html-enhanced',
+          converter: 'custom-ooxml-parser',
           stylesPreserved: true,
         },
       };
-    } else {
-      throw new Error((result as any).error ?? 'DOCX 转 HTML 失败');
     }
+    
+    // OOXML解析器失败，抛出错误
+    throw new Error('OOXML解析器转换失败，无法处理该DOCX文件');
   } catch (conversionError: any) {
     console.error('❌ DOCX 转 HTML 转换失败:', conversionError.message);
     return {
@@ -996,21 +979,34 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
   logConversionStart(inputPath, finalOutputPath);
 
   try {
-    // 使用新的优化转换器
-    const result = await optimizedDocxToPdf(inputPath, {
-      outputPath: finalOutputPath,
-      preserveStyles: true,
+    // 直接使用OOXML解析器进行转换
+    const htmlResult = await convertDocxToHtmlWithOOXML(inputPath, {
       preserveImages: true,
-      preserveLayout: true,
       debug: true,
-      saveIntermediateFiles: true,
-      pdfOptions: {
-        format: options.pdfOptions?.format ?? 'A4',
-        margin: options.pdfOptions?.margin ?? '1in',
-        printBackground: true,
-        landscape: false,
-      },
     });
+    
+    if (!htmlResult.success) {
+      throw new Error(htmlResult.error || 'OOXML解析器转换失败');
+    }
+    
+    // 创建临时HTML文件
+    const tempHtmlPath = finalOutputPath.replace('.pdf', '.html');
+    await fs.writeFile(tempHtmlPath, htmlResult.content, 'utf-8');
+    
+    const result = {
+      success: true,
+      requiresExternalTool: true,
+      htmlPath: tempHtmlPath,
+      outputPath: finalOutputPath,
+      externalToolInstructions: 'Use playwright-mcp to convert HTML to PDF',
+      details: {
+        originalFormat: 'docx',
+        targetFormat: 'pdf',
+        stylesPreserved: true,
+        imagesPreserved: true,
+        conversionTime: Date.now() - startTime
+      }
+    };
 
     if (result.success) {
       console.error(`✅ 转换准备完成!`);
@@ -1059,7 +1055,7 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
         return await handleDirectConversionSuccess(result, hasWatermark, hasQRCode);
       }
     } else {
-      throw new Error(result.error ?? '优化转换器转换失败');
+      throw new Error('OOXML转换器转换失败');
     }
   } catch (error: any) {
     console.error('❌ 优化转换失败，尝试回退方案:', error.message);
@@ -1089,55 +1085,45 @@ function logFallbackConversionStart(docxPath: string, finalOutputPath: string) {
   console.error(`🌍 输出目录由环境变量控制: OUTPUT_DIR=${defaultResourcePaths.outputDir}`);
 }
 
-async function tryDualParsingEngine(docxPath: string): Promise<{ success: boolean, content?: string }> {
+async function tryCustomOOXMLForPdf(docxPath: string): Promise<{ success: boolean, content?: string }> {
   try {
-    console.error('🚀 尝试双重解析引擎...');
-    const dualResult = await dualParsingDocxToHtml({
-      docxPath: docxPath,
-      options: {
-        extractStyles: true,
-        preserveImages: true,
-        generateCompleteHTML: true,
-        inlineCSS: true,
-      },
-    });
-
-    if (dualResult.success && dualResult.content) {
-      console.error('✅ 双重解析引擎转换成功！');
-      return { success: true, content: dualResult.content };
-    }
-    return { success: false };
-  } catch (dualError: any) {
-    console.error('❌ 双重解析引擎失败:', dualError.message);
-    return { success: false };
-  }
-}
-
-async function tryEnhancedMammoth(docxPath: string): Promise<{ success: boolean, content?: string }> {
-  try {
-    console.error('🔄 使用增强型 mammoth 转换器...');
-    const enhancedResult = await convertDocxToHtmlEnhanced(docxPath, {
+    console.error('🚀 PDF转换中尝试自定义OOXML解析器...');
+    const ooxmlResult = await convertDocxToHtmlWithOOXML(docxPath, {
       preserveImages: true,
-      enableExperimentalFeatures: true,
       debug: true,
     });
 
-    if (enhancedResult.success && (enhancedResult as any).content) {
-      console.error('✅ 增强型 mammoth 转换成功！');
-      return { success: true, content: (enhancedResult as any).content };
+    if (ooxmlResult.success && ooxmlResult.content) {
+      console.error('✅ PDF转换中自定义OOXML解析器成功！');
+      
+      // 检查列表渲染情况
+      const listMatches = ooxmlResult.content.match(/<[uo]l[^>]*>[\s\S]*?<\/[uo]l>/g);
+      if (listMatches) {
+        console.error(`📋 检测到 ${listMatches.length} 个列表`);
+        listMatches.forEach((list, i) => {
+          console.error(`列表 ${i+1}: ${list.substring(0, 100)}...`);
+        });
+      } else {
+        console.error('⚠️ 未检测到列表标签，检查段落内容...');
+        const paragraphs = ooxmlResult.content.match(/<p[^>]*>[^<]*[工作时间|午休时间|因工作安排][^<]*<\/p>/g);
+        if (paragraphs) {
+          console.error(`📝 找到 ${paragraphs.length} 个可能的列表段落:`);
+          paragraphs.forEach((p, i) => {
+            console.error(`段落 ${i+1}: ${p}`);
+          });
+        }
+      }
+      
+      return { success: true, content: ooxmlResult.content };
     }
     return { success: false };
-  } catch (enhancedError: any) {
-    console.error('❌ 增强型 mammoth 失败:', enhancedError.message);
+  } catch (ooxmlError: any) {
+    console.error('❌ PDF转换中自定义OOXML解析器失败:', ooxmlError.message);
     return { success: false };
   }
 }
 
-async function useBasicMammothFallback(docxPath: string, options: any): Promise<string> {
-  console.error('🔄 使用最终回退方案...');
-  const basicResult = await mammoth.convertToHtml({ path: docxPath });
-  return createPerfectWordHtml(basicResult.value, options);
-}
+
 
 // 回退转换方法（简化的原有逻辑）
 async function fallbackConvertDocxToPdf(inputPath: string, outputPath?: string, options: any = {}) {
@@ -1163,17 +1149,14 @@ async function fallbackConvertDocxToPdf(inputPath: string, outputPath?: string, 
 
 // 生成HTML内容的辅助函数
 async function generateHtmlContent(docxPath: string, options: any): Promise<string> {
-  const dualResult = await tryDualParsingEngine(docxPath);
-  if (dualResult.success && dualResult.content) {
-    return dualResult.content;
+  // 第一步：尝试自定义OOXML解析器
+  const ooxmlResult = await tryCustomOOXMLForPdf(docxPath);
+  if (ooxmlResult.success && ooxmlResult.content) {
+    return ooxmlResult.content;
   }
   
-  const enhancedResult = await tryEnhancedMammoth(docxPath);
-  if (enhancedResult.success && enhancedResult.content) {
-    return enhancedResult.content;
-  }
-  
-  return await useBasicMammothFallback(docxPath, options);
+  // 如果OOXML解析器失败，抛出错误
+  throw new Error('OOXML解析器处理失败，无法处理该DOCX文件');
 }
 
 // 处理HTML样式的辅助函数
@@ -2169,8 +2152,10 @@ async function addQRCode(pdfPath: string, qrCodePath?: string, options: QRCodeOp
     const qrImageBytes = await fs.readFile(finalQrPath);
     const qrImage = await pdfDoc.embedPng(qrImageBytes);
 
-    for (const page of pages) {
-      const { width, height } = page.getSize();
+    // 只在最后一页添加二维码
+    if (pages.length > 0) {
+      const lastPage = pages[pages.length - 1];
+      const { width, height } = lastPage.getSize();
       const scale = options.qrScale ?? 0.15;
       const opacity = options.qrOpacity ?? 1.0;
       const position = options.qrPosition ?? 'bottom-center';
@@ -2179,7 +2164,7 @@ async function addQRCode(pdfPath: string, qrCodePath?: string, options: QRCodeOp
       const qrHeight = qrImage.height * scale;
       const { x, y } = calculateQRPosition(position, width, height, qrWidth, qrHeight);
 
-      page.drawImage(qrImage, {
+      lastPage.drawImage(qrImage, {
         x,
         y,
         width: qrWidth,
@@ -2193,7 +2178,7 @@ async function addQRCode(pdfPath: string, qrCodePath?: string, options: QRCodeOp
         const textSize = options.textSize ?? 8;
         const textColor = options.textColor ?? '#000000';
 
-        page.drawText(text, {
+        lastPage.drawText(text, {
           x: x + (qrWidth - text.length * textSize * 0.6) / 2,
           y: y - 15,
           size: textSize,
@@ -2468,11 +2453,26 @@ async function convertDocxToMarkdown(inputPath: string, outputPath?: string, opt
     // 确保输出目录存在
     await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
 
-    // 使用优化的转换器
-    const result = await optimizedDocxToMarkdown(inputPath, {
-      outputPath: finalOutputPath,
-      ...options,
+    // 先转换为HTML，然后转换为Markdown
+    const htmlResult = await convertDocxToHtmlWithOOXML(inputPath, {
+      preserveImages: false,
+      debug: true,
     });
+    
+    if (!htmlResult.success) {
+      throw new Error(`DOCX 到 HTML 转换失败: ${htmlResult.error || '未知错误'}`);
+    }
+    
+    // 从HTML转换为Markdown
+    const markdownResult = await convertHtmlToMarkdown(htmlResult.content, {
+      outputPath: finalOutputPath,
+      preserveStyles: options.preserveFormatting !== false,
+    });
+    
+    const result = {
+      success: markdownResult.success,
+      error: markdownResult.error
+    };
 
     if (result.success) {
       console.error(`✅ DOCX 到 Markdown 转换成功: ${finalOutputPath}`);
@@ -2520,14 +2520,17 @@ async function convertDocxToTxt(inputPath: string, outputPath?: string, options:
     await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
 
     // 先转换为 HTML，然后提取纯文本
-    const htmlResult = await convertDocxToHtmlEnhanced(inputPath);
+    const htmlResult = await convertDocxToHtmlWithOOXML(inputPath, {
+      preserveImages: false,
+      debug: true,
+    });
 
     if (!htmlResult.success) {
-      throw new Error(`DOCX 到 HTML 转换失败: ${(htmlResult as any).error || '未知错误'}`);
+      throw new Error(`DOCX 到 HTML 转换失败: ${htmlResult.error || '未知错误'}`);
     }
 
     // 从 HTML 中提取纯文本
-    const $ = cheerio.load((htmlResult as any).content || '');
+    const $ = cheerio.load(htmlResult.content || '');
 
     // 移除样式和脚本标签
     $('style, script').remove();
@@ -3028,9 +3031,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     TOOL_DEFINITIONS.convert_html_to_markdown,
     TOOL_DEFINITIONS.plan_conversion,
     TOOL_DEFINITIONS.process_pdf_post_conversion,
-    ...DUAL_PARSING_TOOLS,
-    WEB_SCRAPING_TOOL,
-    STRUCTURED_DATA_TOOL,
+
   ],
 }));
 
@@ -3083,10 +3084,7 @@ async function handleToolCall(name: string, args: any) {
     return await handleHtmlOperations(name, args);
   }
   
-  // 双重解析操作
-  if (isDualParsingOperation(name)) {
-    return await handleDualParsingOperations(name, args);
-  }
+
   
   // 转换规划操作
   if (name === 'plan_conversion') {
@@ -3116,10 +3114,7 @@ function isHtmlOperation(name: string): boolean {
   return ['convert_html_to_markdown'].includes(name);
 }
 
-// 检查是否为双重解析操作
-function isDualParsingOperation(name: string): boolean {
-  return ['dual_parsing_docx_to_html', 'dual_parsing_docx_to_pdf', 'docx_style_analysis'].includes(name);
-}
+
 
 // 处理基础文档操作
 async function handleBasicDocumentOperations(name: string, args: any) {
@@ -3225,19 +3220,7 @@ async function handleHtmlToMarkdown(args: any) {
   });
 }
 
-// 处理双重解析操作
-async function handleDualParsingOperations(name: string, args: any) {
-  switch (name) {
-    case 'dual_parsing_docx_to_html':
-      return await dualParsingDocxToHtml(args);
-    case 'dual_parsing_docx_to_pdf':
-      return await dualParsingDocxToPdf(args);
-    case 'docx_style_analysis':
-      return await analyzeDualParsingStyles(args);
-    default:
-      throw new Error(`Unknown dual parsing operation: ${name}`);
-  }
-}
+
 
 // 处理转换规划
 async function handleConversionPlanning(args: any) {

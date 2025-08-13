@@ -309,7 +309,7 @@ class ConversionPlanner {
     const specialMappings: Record<string, Record<string, string>> = {
       docx: {
         pdf: 'convert_docx_to_pdf',
-        html: 'dual_parsing_docx_to_html',
+        html: 'convert_document',
       },
       markdown: {
         html: 'convert_markdown_to_html',
@@ -403,7 +403,7 @@ class ConversionPlanner {
   private getStepDescription(fromFormat: string, toFormat: string, toolName: string): string {
     const descriptions: Record<string, string> = {
       convert_docx_to_pdf: '将DOCX文档转换为PDF格式，保持完整样式',
-      dual_parsing_docx_to_html: '将DOCX文档转换为HTML格式，保留样式和图片',
+
       convert_markdown_to_html: '将Markdown文档转换为HTML格式，应用主题样式',
       convert_markdown_to_docx: '将Markdown文档转换为DOCX格式，应用专业样式',
       convert_html_to_markdown: '将HTML文档转换为Markdown格式，保留结构',
@@ -427,7 +427,7 @@ class ConversionPlanner {
       return '将DOCX文档转换为Markdown格式，使用优化转换器提取文本内容和结构，保留标题、段落、列表等格式';
     }
     if (fromFormat === 'docx' && toFormat === 'html') {
-      return '将DOCX文档转换为HTML格式，使用增强型mammoth转换器保留样式、格式和结构，生成完整的HTML文档';
+      return '将DOCX文档转换为HTML格式，使用OOXML解析器保留样式、格式和结构，生成完整的HTML文档';
     }
     return `将${fromFormat.toUpperCase()}格式转换为${toFormat.toUpperCase()}格式，保持文档内容和基本结构`;
   }
@@ -517,7 +517,7 @@ class ConversionPlanner {
     }
 
     if (sourceFormat === 'docx' && targetFormat === 'html') {
-      recommendations.push('DOCX到HTML转换使用增强型mammoth转换器，完整保留样式和格式');
+      recommendations.push('DOCX到HTML转换使用OOXML解析器，完整保留样式和格式');
       recommendations.push('转换后的HTML文件包含完整的CSS样式，可在浏览器中正确显示');
       recommendations.push('建议启用样式保留和图片保存以获得最佳效果');
     }
@@ -528,6 +528,12 @@ class ConversionPlanner {
     }
 
     if (targetFormat === 'pdf') {
+      recommendations.push('📋 【必读前置条件】以下规则必须严格遵循：');
+      recommendations.push('🔒 二维码规则：仅当用户明确要求添加二维码时才能添加，默认情况下不添加二维码');
+      recommendations.push('📍 二维码位置：如需添加二维码，只能在PDF的最后一页底部中间位置，不能在每页都添加');
+      recommendations.push('⚠️ 重要：使用playwright mcp 中的 browser_pdf_save 方法时必须设置printBackground: true以保留背景色和样式');
+      recommendations.push('建议PDF生成参数：{"printBackground": true, "preferCSSPageSize": true, "format": "A4"}');
+      recommendations.push('如果PDF中缺少背景色或高亮样式，请检查printBackground参数是否已启用');
       recommendations.push('PDF转换可能需要额外的字体支持以正确显示中文');
     }
 

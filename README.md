@@ -156,6 +156,22 @@ This MCP server's PDF conversion functionality depends on the `playwright-mcp` s
   3. Automatically add watermark (if `WATERMARK_IMAGE` is configured)
   4. Optionally add QR code (if `addQrCode=true` and `QR_CODE_IMAGE` is configured)
 
+#### Third-Party Dependency Disclaimer
+
+**Important Notice**: `playwright-mcp` is an independent third-party project. This project (doc-ops-mcp) does not assume responsibility for:
+
+- The availability, security, or behavior of `playwright-mcp`
+- Any issues, vulnerabilities, or data loss caused by `playwright-mcp`
+- The maintenance, updates, or support of `playwright-mcp`
+
+**Users must:**
+- Review and comply with `playwright-mcp`'s own license terms and conditions
+- Understand the risks associated with using third-party dependencies
+- Ensure `playwright-mcp` meets their security and compliance requirements
+- Monitor `playwright-mcp` for updates and security patches independently
+
+Please refer to the official `playwright-mcp` documentation and repository for license information, security advisories, and usage guidelines.
+
 ### Configuration Requirements
 
 1. **Install playwright-mcp**:
@@ -472,6 +488,16 @@ Generate conversion plan by analyzing input file and providing conversion sugges
 **External Dependency:** Works with `playwright-mcp` generated PDF files
 
 #### Web Scraping Tools
+
+**⚠️ Legal and Ethical Use Notice**: Web scraping tools should be used in compliance with target websites' Terms of Service and applicable laws and regulations. Users are responsible for:
+
+- Respecting robots.txt files and website scraping policies
+- Complying with data protection and privacy laws (GDPR, CCPA, etc.)
+- Avoiding excessive requests that may impact website performance
+- Obtaining necessary permissions for commercial use of scraped data
+- Respecting intellectual property rights and copyright laws
+
+This tool is provided for legitimate research, development, and automation purposes. Misuse of these tools may result in legal consequences.
 
 ##### **take_screenshot**
 🖼️ Web screenshot tool - Capture webpage or HTML content screenshot using Playwright Chromium.

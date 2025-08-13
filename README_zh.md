@@ -157,6 +157,22 @@ Document Operations MCP Server 采用混合架构设计，结合内部处理和�
   3. 自动添加水印（如果配置了 `WATERMARK_IMAGE`）
   4. 可选添加二维码（如果设置了 `addQrCode=true` 且配置了 `QR_CODE_IMAGE`）
 
+#### 第三方依赖免责声明
+
+**重要提示**：`playwright-mcp` 是一个独立的第三方项目。本项目（doc-ops-mcp）不对以下方面承担责任：
+
+- `playwright-mcp` 的可用性、安全性或行为
+- 由 `playwright-mcp` 引起的任何问题、漏洞或数据丢失
+- `playwright-mcp` 的维护、更新或支持
+
+**用户必须：**
+- 审查并遵守 `playwright-mcp` 自身的许可条款和条件
+- 了解使用第三方依赖的相关风险
+- 确保 `playwright-mcp` 符合其安全性和合规性要求
+- 独立监控 `playwright-mcp` 的更新和安全补丁
+
+请参考 `playwright-mcp` 的官方文档和代码库，了解许可信息、安全公告和使用指南。
+
 ### 配置要求
 
 1. **安装 playwright-mcp**：
@@ -438,6 +454,16 @@ HTML转Markdown。
 - 对于复杂格式文档（如DOCX），系统会自动选择最佳转换路径
 
 #### 网页抓取工具
+
+**⚠️ 法律和道德使用声明**：网页抓取工具应在遵守目标网站服务条款和相关法律法规的前提下使用。用户有责任：
+
+- 遵守 robots.txt 文件和网站抓取政策
+- 遵守数据保护和隐私法律（GDPR、CCPA 等）
+- 避免过度请求影响网站性能
+- 获得商业使用抓取数据的必要许可
+- 尊重知识产权和版权法
+
+此工具仅供合法的研究、开发和自动化目的使用。滥用这些工具可能导致法律后果。
 
 ##### **take_screenshot**
 🖼️ 网页截图工具 - 使用Playwright Chromium捕获网页或HTML内容截图。

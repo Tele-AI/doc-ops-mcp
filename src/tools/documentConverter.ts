@@ -426,6 +426,35 @@ export class DocumentConverter {
             margin: 0;
             padding: 20px;
             background: white;
+            word-wrap: break-word;
+            word-break: break-all;
+        }
+        
+        p {
+            margin: 12px 0;
+            line-height: 1.6;
+            text-align: justify;
+            word-spacing: 0.1em;
+            padding: 4px 0;
+        }
+        
+        h1, h2, h3, h4, h5, h6 {
+            margin: 20px 0 12px 0;
+            line-height: 1.4;
+            padding: 6px 0;
+        }
+        
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            margin: 12px 0;
+            padding: 12px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        
+        br {
+            line-height: 1.6;
         }
         
         h1 {

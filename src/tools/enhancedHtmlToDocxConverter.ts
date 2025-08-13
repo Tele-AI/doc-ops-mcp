@@ -268,9 +268,9 @@ class EnhancedHtmlToDocxConverter {
           heading: finalStyle.heading,
           alignment: finalStyle.alignment ?? AlignmentType.LEFT,
           spacing: {
-            before: 480, // 标题前间距
-            after: 240, // 标题后间距
-            line: 360, // 1.5倍行距
+            before: 360, // 标题前间距
+            after: 360, // 标题后间距
+            line: 300, // 1.25倍行距
             lineRule: 'auto',
           },
           children: [
@@ -291,9 +291,10 @@ class EnhancedHtmlToDocxConverter {
         return new Paragraph({
           alignment: finalStyle.alignment ?? AlignmentType.LEFT,
           spacing: {
-            line: 360, // 1.5倍行距
+            line: 300, // 1.25倍行距
             lineRule: 'auto',
             after: 240, // 段后间距
+            before: 120, // 段前间距
           },
           children: this.createTextRuns(element, finalStyle, $),
         });
@@ -306,10 +307,10 @@ class EnhancedHtmlToDocxConverter {
         return new Paragraph({
           alignment: finalStyle.alignment ?? AlignmentType.LEFT,
           spacing: {
-            line: 360,
+            line: 300,
             lineRule: 'auto',
-            before: 240,
-            after: 240,
+            before: 360,
+            after: 360,
           },
           indent: {
             left: 720, // 0.5 inch
@@ -359,8 +360,14 @@ class EnhancedHtmlToDocxConverter {
             runOptions.underline = finalStyle.underline;
           }
           return new Paragraph({
-            children: [new TextRun(runOptions)],
-          });
+          spacing: {
+            line: 300, // 1.25倍行距
+            lineRule: 'auto',
+            after: 240, // 段后间距
+            before: 120, // 段前间距
+          },
+          children: [new TextRun(runOptions)],
+        });
         }
         return null;
     }
@@ -407,18 +414,56 @@ class EnhancedHtmlToDocxConverter {
   }
 
   private processTextNode(node: any, baseStyle: StyleMapping, runs: any[]): void {
-    if (node.data.trim()) {
-      const textOptions: any = {
-        text: node.data,
-        bold: baseStyle.bold,
-        italics: baseStyle.italics,
-        size: baseStyle.size,
-        color: baseStyle.color,
-      };
-      if (baseStyle.underline) {
-        textOptions.underline = baseStyle.underline;
+    if (node.data) {
+      // 保留原始文本，包括空格和换行
+      let text = node.data;
+      
+      // 处理换行符，转换为软换行
+      if (text.includes('\n')) {
+        const parts = text.split('\n');
+        for (let i = 0; i < parts.length; i++) {
+          if (parts[i] || i === 0) {
+            const textOptions: any = {
+              text: parts[i],
+              bold: baseStyle.bold,
+              italics: baseStyle.italics,
+              size: baseStyle.size,
+              color: baseStyle.color,
+              font: {
+                name: 'Microsoft YaHei, SimHei, Arial, sans-serif',
+              },
+            };
+            if (baseStyle.underline) {
+              textOptions.underline = baseStyle.underline;
+            }
+            runs.push(new TextRun(textOptions));
+          }
+          
+          // 添加软换行（除了最后一个部分）
+          if (i < parts.length - 1) {
+            runs.push(new TextRun({ 
+              text: '',
+              break: 1
+            }));
+          }
+        }
+      } else if (text.trim() || text.includes(' ')) {
+        // 保留空格
+        const textOptions: any = {
+          text: text,
+          bold: baseStyle.bold,
+          italics: baseStyle.italics,
+          size: baseStyle.size,
+          color: baseStyle.color,
+          font: {
+            name: 'Microsoft YaHei, SimHei, Arial, sans-serif',
+          },
+        };
+        if (baseStyle.underline) {
+          textOptions.underline = baseStyle.underline;
+        }
+        runs.push(new TextRun(textOptions));
       }
-      runs.push(new TextRun(textOptions));
     }
   }
 

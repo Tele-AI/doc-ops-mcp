@@ -38,6 +38,17 @@ Enhancement suggestions are tracked as GitHub issues. When creating an enhanceme
 - Ensure all tests pass
 - Link to any related issues
 
+#### Intellectual Property License
+
+**By submitting a Pull Request, you agree that all contributions submitted through Pull Requests will be licensed under the MIT License.** This means:
+
+- You grant the project maintainers and users the right to use, modify, and distribute your contributions under the MIT License
+- You confirm that you have the right to make these contributions
+- You understand that your contributions will become part of the open source project
+- You waive any claims to exclusive ownership of the contributed code
+
+If you cannot agree to these terms, please do not submit a Pull Request.
+
 ## Development Setup
 
 1. Fork and clone the repository

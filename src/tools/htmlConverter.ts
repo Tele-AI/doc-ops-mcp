@@ -1063,6 +1063,57 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
   }
 
   /**
+   * 优化段落间距和样式处理
+   */
+  private optimizeParagraphSpacing(element: any): any {
+    const spacing: any = {};
+    
+    // 设置默认段落间距
+    spacing.before = 240; // 12pt
+    spacing.after = 240;  // 12pt
+    
+    // 根据元素类型调整间距
+    const tagName = element.prop('tagName')?.toLowerCase();
+    if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName)) {
+      spacing.before = 400; // 20pt
+      spacing.after = 240;  // 12pt
+    }
+    
+    if (tagName === 'pre') {
+      spacing.before = 240; // 12pt
+      spacing.after = 240;  // 12pt
+    }
+    
+    if (tagName === 'br') {
+      spacing.before = 160; // 8pt
+      spacing.after = 160;  // 8pt
+    }
+    
+    return spacing;
+  }
+
+  /**
+   * 优化文本对齐和换行处理
+   */
+  private optimizeTextAlignment(tagName?: string): any {
+    const config: any = {
+      wordWrap: true,
+      breakWords: true
+    };
+    
+    // 根据元素类型设置对齐方式
+    if (['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].includes(tagName || '')) {
+      config.alignment = AlignmentType.LEFT;
+    } else if (tagName === 'pre') {
+      config.alignment = AlignmentType.LEFT;
+    } else {
+      config.alignment = AlignmentType.JUSTIFIED; // 两端对齐
+    }
+    
+    return config;
+  }
+
+  /**
    * 解析并设置字体族
    */
   private parseAndSetFontFamily(value: string, styles: any): void {
