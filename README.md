@@ -542,21 +542,43 @@ This tool is provided for legitimate research, development, and automation purpo
 - `options` (object, optional) - Scraping options:
   - `timeout` (number) - Timeout in milliseconds
 
-### Supported Conversions
-| From\To | PDF | DOCX | HTML | Markdown |
-|---------|----|----- |------|----------|
-| **PDF** | ✅ | ❌ | ❌ | ❌ |
-| **DOCX** | ✅ | ✅ | ✅ | ✅ |
-| **HTML** | ✅ | ❌ | ✅ | ✅ |
-| **Markdown** | ✅ | ✅ | ✅ | ✅ |
+### Supported Document Operations
+
+| Format | Convert to PDF | Convert to DOCX | Convert to HTML | Convert to Markdown | Content Rewriting | Watermark/QR Code |
+|--------|----------------|-----------------|-----------------|---------------------|-------------------|-------------------|
+| **PDF** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **DOCX** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **HTML** | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ |
+| **Markdown** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+
+**Rewriting Features:**
+- **Content Replacement**: Support batch text replacement and regular expression replacement
+- **Format Adjustment**: Modify document structure, heading levels, and style formatting
+- **Smart Rewriting**: Content optimization while preserving original document format
 
 ## Usage Examples
 
+**Format Conversion:**
 ```
-Convert /Users/docs/report.pdf to DOCX
+Convert /Users/docs/report.docx to PDF
+Convert /Users/docs/article.md to HTML
+Convert /Users/docs/presentation.html to DOCX
+Convert /Users/docs/readme.md to PDF (with theme styling)
+```
+
+**Document Rewriting:**
+```
 Rewrite company names in /Users/docs/contract.md
 Batch replace terminology in /Users/docs/manual.docx
-Adjust heading formats in /Users/docs/article.html
+Adjust heading levels in /Users/docs/article.html
+Update dates and version numbers in /Users/docs/policy.md
+```
+
+**PDF Enhancement:**
+```
+Add watermark to /Users/docs/document.pdf
+Add QR code to /Users/docs/report.pdf
+Add company logo watermark to /Users/docs/invoice.pdf
 ```
 
 ## 5. Performance Metrics

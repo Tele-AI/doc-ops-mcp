@@ -12,7 +12,7 @@
 
 1. [快速开始](#1-快速开始)
 2. [系统架构](#2-系统架构)
-3. [外部依赖说明](#3-外部依赖说明)
+3. [可选集成说明](#3-可选集成说明)
 4. [功能特性](#4-功能特性)
 5. [性能指标](#5-性能指标)
 6. [开源协议](#6-开源协议)
@@ -55,6 +55,45 @@ bun add -g doc-ops-mcp
 }
 ```
 
+### 支持的文档操作
+
+| 格式 | 转换到PDF | 转换到DOCX | 转换到HTML | 转换到Markdown | 内容改写 | 水印/二维码 |
+|------|----------|-----------|-----------|--------------|----------|------------|
+| **PDF** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **DOCX** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **HTML** | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ |
+| **Markdown** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+
+**改写功能说明：**
+- **内容替换**：支持文本内容的批量替换和正则表达式替换
+- **格式调整**：修改文档结构、标题层级和样式格式
+- **智能改写**：保持原文档格式的同时进行内容优化
+
+### 使用示例
+
+**格式转换：**
+```
+将 /Users/docs/report.docx 转换为 PDF
+将 /Users/docs/article.md 转换为 HTML
+将 /Users/docs/presentation.html 转换为 DOCX
+将 /Users/docs/readme.md 转换为 PDF（带主题样式）
+```
+
+**文档改写：**
+```
+改写 /Users/docs/contract.md 中的公司名称
+批量替换 /Users/docs/manual.docx 中的术语
+调整 /Users/docs/article.html 的标题层级
+更新 /Users/docs/policy.md 中的日期和版本号
+```
+
+**PDF增强：**
+```
+为 /Users/docs/document.pdf 添加水印
+为 /Users/docs/report.pdf 添加二维码
+为 /Users/docs/invoice.pdf 添加公司logo水印
+```
+
 ### 环境变量
 
 服务器支持环境变量来控制输出路径和PDF增强功能：
@@ -82,7 +121,7 @@ bun add -g doc-ops-mcp
 
 ## 2. 系统架构
 
-Document Operations MCP Server 采用混合架构设计，结合内部处理和外部依赖：
+Document Operations MCP Server 采用纯 JavaScript 架构设计，提供完整的文档处理能力：
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -105,8 +144,8 @@ Document Operations MCP Server 采用混合架构设计，结合内部处理和�
 │  │  └─────────────┘  └─────────────┘  └─────────────┘   │ │
 │  │                                                        │ │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │ │
-│  │  │   PDF       │  │   水印/     │  │   网页      │   │ │
-│  │  │   增强      │  │   二维码    │  │   抓取      │   │ │
+│  │  │   PDF       │  │   水印/     │  │   转换      │   │ │
+│  │  │   增强      │  │   二维码    │  │   规划器    │   │ │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘   │ │
 └────┴───────────────────────────────────────────────────────┴─┘
                             │
@@ -116,183 +155,46 @@ Document Operations MCP Server 采用混合架构设计，结合内部处理和�
 │  │   pdf-lib   │  │   mammoth   │  │   marked    │          │
 │  │   (PDF处理) │  │  (DOCX处理) │  │ (Markdown)  │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
-└─────────────────────────────────────────────────────────────┘
-                            │
-┌───────────────────────────┴─────────────────────────────────┐
-│                   外部依赖层 (PDF转换)                      │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                playwright-mcp                       │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐ │   │
-│  │  │  浏览器     │  │   HTML      │  │   PDF       │ │   │
-│  │  │  自动化     │  │   渲染      │  │   生成      │ │   │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘ │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
+│  │   cheerio   │  │   turndown  │  │   docx      │          │
+│  │ (HTML解析)  │  │ (HTML转MD)  │  │ (DOCX生成)  │          │
+│  └─────────────┘  └─────────────┘  └─────────────┘          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### 架构说明
 
-**内部处理层**：
-- 文档读取、格式转换、样式处理
-- PDF 水印和二维码添加
-- 网页内容抓取
+**核心特性**：
+- 纯 JavaScript 实现，无外部系统依赖
+- 完整的文档读取、转换、样式处理能力
+- 内置 PDF 水印和二维码添加功能
+- 智能转换规划和路径优化
 
-**外部依赖层**：
-- **PDF 转换**：依赖 `playwright-mcp` 进行 HTML → PDF 转换
-- **转换流程**：DOCX/Markdown → HTML → PDF (通过 playwright-mcp)
+**转换流程**：
+- **直接转换**：支持大部分格式间的直接转换
+- **多步转换**：复杂转换通过中间格式实现
+- **样式保留**：使用 OOXML 解析器确保样式完整性
 
-**重要提示**：所有 PDF 转换功能都需要配合 `playwright-mcp` 使用。
+## 3. 可选集成说明
 
-## 3. 外部依赖说明
+本服务器可与 `playwright-mcp` 配合使用，获得增强的 PDF 转换能力。详细配置请参考 `playwright-mcp` 官方文档。
 
-### playwright-mcp 依赖
+### 🔧 PDF转换工作流程
 
-本 MCP 服务器的 PDF 转换功能依赖于 `playwright-mcp` 服务器：
-
-- **依赖工具**：`convert_docx_to_pdf`、`convert_markdown_to_pdf`
-- **重要配置**：`playwright-mcp` 必须使用 `--caps=pdf` 参数才能提供 `browser_pdf_save` 命令
-- **转换流程**：
-  1. 将源文档转换为 HTML 格式
-  2. 通过 `playwright-mcp` 的 `browser_pdf_save` 命令将 HTML 渲染为 PDF
-  3. 自动添加水印（如果配置了 `WATERMARK_IMAGE`）
-  4. 可选添加二维码（如果设置了 `addQrCode=true` 且配置了 `QR_CODE_IMAGE`）
-
-#### 第三方依赖免责声明
-
-**重要提示**：`playwright-mcp` 是一个独立的第三方项目。本项目（doc-ops-mcp）不对以下方面承担责任：
-
-- `playwright-mcp` 的可用性、安全性或行为
-- 由 `playwright-mcp` 引起的任何问题、漏洞或数据丢失
-- `playwright-mcp` 的维护、更新或支持
-
-**用户必须：**
-- 审查并遵守 `playwright-mcp` 自身的许可条款和条件
-- 了解使用第三方依赖的相关风险
-- 确保 `playwright-mcp` 符合其安全性和合规性要求
-- 独立监控 `playwright-mcp` 的更新和安全补丁
-
-请参考 `playwright-mcp` 的官方文档和代码库，了解许可信息、安全公告和使用指南。
-
-### 配置要求
-
-1. **安装 playwright-mcp**：
-   ```bash
-   # 请参考 playwright-mcp 的官方文档进行安装和配置
-   ```
-
-2. **MCP 客户端配置**：
-   确保在 MCP 客户端中同时配置了本服务器和 `playwright-mcp`
-   
-   **重要**：`playwright-mcp` 必须使用 `--caps=pdf` 参数：
-   ```json
-   {
-     "mcpServers": {
-       "playwright": {
-         "command": "npx",
-         "args": ["@playwright/mcp@latest", "--caps=pdf"]
-       }
-     }
-   }
-   ```
-
-3. **环境变量**：
-   - `WATERMARK_IMAGE`：水印图片路径（可选，PDF 转换时自动添加）
-   - `QR_CODE_IMAGE`：二维码图片路径（可选，需要时添加）
-
-### 🔧 PDF转换工作流程（重要）
-
-**当使用 `playwright-mcp` 生成PDF后，必须按以下步骤操作：**
-
-1. **HTML生成阶段**：将源文档（如Markdown、DOCX）转换为带样式的HTML文件
-2. **PDF生成阶段**：调用 `playwright-mcp` 的 `browser_pdf_save` 命令将HTML转换为PDF（会保存在临时目录）
-3. **后处理阶段**：**必须**调用 `process_pdf_post_conversion` 工具完成路径转换、水印和二维码添加
-
-**示例工作流程：**
-```
-1. playwright-mcp:browser_pdf_save -> 生成临时PDF: /tmp/playwright-output/file.pdf
-2. doc-ops-mcp:process_pdf_post_conversion -> 处理并保存到: /output/final.pdf
-```
-
-⚠️ **关键提示**：使用 `playwright-mcp` 生成PDF后，必须立即调用 `doc-ops-mcp` 的 `process_pdf_post_conversion` 工具来完成最终处理。
-
-### 🤖 大模型工作流程指导
-
-**为确保大模型正确执行PDF转换后处理，请遵循以下指导原则：**
-
-#### 1. 工具调用顺序约束
-- 当需要生成PDF时，必须按照以下顺序调用工具：
-  1. 首先生成HTML文件（使用相应的转换工具）
-  2. 然后调用 `playwright-mcp:browser_pdf_save` 生成PDF
-  3. **立即**调用 `doc-ops-mcp:process_pdf_post_conversion` 完成后处理
-
-#### 2. 工具描述中的关键信息
-- `process_pdf_post_conversion` 工具的描述明确标注了 "⚠️ 重要：这是playwright-mcp的browser_pdf_save命令的必要后续步骤！"
-- 大模型应该识别这个关键信息并自动执行后续步骤
-
-#### 3. 推荐的提示词模式
-当用户请求PDF转换时，建议使用以下思路：
-```
-用户要求：将Markdown转换为PDF
-执行步骤：
-1. 使用 convert_markdown_to_html 生成HTML
-2. 使用 playwright-mcp:browser_pdf_save 生成PDF
-3. 使用 process_pdf_post_conversion 完成最终处理
-```
-
-#### 4. 自动化工作流程
-- 大模型应该将 `playwright-mcp:browser_pdf_save` 和 `process_pdf_post_conversion` 视为一个原子操作
-- 不应该在两个步骤之间等待用户确认
-- 应该自动传递正确的文件路径参数
-
-#### 5. 完整示例工作流程
-
-**场景：用户要求将 `document.md` 转换为PDF**
-
-```json
-// 步骤1：转换Markdown到HTML
-{
-  "tool": "doc-ops-mcp:convert_markdown_to_html",
-  "params": {
-    "markdownPath": "/path/to/document.md",
-    "theme": "github"
-  }
-}
-// 结果：生成 /output/document.html
-
-// 步骤2：使用playwright-mcp生成PDF
-{
-  "tool": "playwright-mcp:browser_pdf_save",
-  "params": {
-    "url": "file:///output/document.html",
-    "path": "/tmp/playwright-output/document.pdf"
-  }
-}
-// 结果：生成临时PDF /tmp/playwright-output/document.pdf
-
-// 步骤3：立即调用后处理工具（必须！）
-{
-  "tool": "doc-ops-mcp:process_pdf_post_conversion",
-  "params": {
-    "playwrightPdfPath": "/tmp/playwright-output/document.pdf",
-    "targetPath": "document.pdf",
-    "addWatermark": true,
-    "addQrCode": true
-  }
-}
-// 结果：最终PDF保存到 /output/document.pdf，包含水印和二维码
-```
-
-**关键点：**
-- 步骤2和步骤3之间不能有任何中断
-- `playwrightPdfPath` 必须是步骤2生成的确切路径
-- 如果设置了环境变量，水印和二维码会自动添加
+本服务器支持完整的PDF转换功能：
+1. **文档解析**：使用OOXML解析器确保样式完整保留
+2. **格式转换**：将文档转换为高质量HTML格式
+3. **PDF生成**：内置转换器或可选配合 `playwright-mcp` 使用
+4. **增强处理**：自动添加水印和二维码（如果配置）
 
 ### 工作原理
 
-当执行 PDF 转换时，本服务器会：
-1. 处理源文档并生成 HTML
-2. 调用 `playwright-mcp` 的工具进行 HTML → PDF 转换
-3. 通过 `process_pdf_post_conversion` 对生成的 PDF 进行后处理（路径移动、水印、二维码）
+本服务器采用智能转换架构：
+1. **智能规划**：`plan_conversion` 分析转换需求，选择最优路径
+2. **格式转换**：使用专用转换器处理各种文档格式
+3. **样式保留**：通过 OOXML 解析器确保样式完整性
+4. **增强处理**：自动添加水印、二维码等增强功能
+5. **可选集成**：支持与 `playwright-mcp` 配合获得增强能力
 
 ## 4. 功能特性
 
@@ -304,8 +206,8 @@ Document Operations MCP Server 采用混合架构设计，结合内部处理和�
 |---------|----------|----------|----------|
 | `read_document` | 读取文档内容 | `filePath`: 文档路径<br>`extractMetadata`: 提取元数据<br>`preserveFormatting`: 保留格式 | 无 |
 | `write_document` | 写入文档内容 | `content`: 文档内容<br>`outputPath`: 输出文件路径<br>`encoding`: 文件编码 | 无 |
-| `convert_document` | 智能文档转换 | `inputPath`: 输入文件路径<br>`outputPath`: 输出文件路径<br>`preserveFormatting`: 保留格式<br>`useInternalPlaywright`: 使用内置Playwright | 根据转换类型 |
-| `rewrite_document` | 智能文档改写 | `inputPath`: 文档路径<br>`rewriteRules`: 改写规则列表<br>`outputPath`: 输出路径<br>`preserveOriginalFormat`: 保持原格式 | 无 |
+| `convert_document` | 智能文档转换 | `inputPath`: 输入文件路径<br>`outputPath`: 输出文件路径<br>`preserveFormatting`: 保留格式 | 无 |
+| `plan_conversion` | 转换规划器 | `sourceFormat`: 源格式<br>`targetFormat`: 目标格式<br>`preserveStyles`: 保留样式<br>`quality`: 转换质量 | 无 |
 
 ##### **read_document**
 读取各种文档格式，包括PDF、DOCX、DOC、HTML、MD等格式。
@@ -339,8 +241,10 @@ DOCX转PDF，自动添加水印（如果配置）。
 - `docxPath` (string, 必需) - DOCX文件路径
 - `outputPath` (string, 可选) - 输出PDF路径（不指定则自动生成）
 - `addQrCode` (boolean, 可选) - 是否添加二维码，默认为`false`
+- `preserveFormatting` (boolean, 可选) - 保留原始格式，默认为`true`
+- `chineseFont` (string, 可选) - 中文字体，默认为`Microsoft YaHei`
 
-**外部依赖：** 需要 `playwright-mcp` 进行PDF转换
+**可选集成：** 可与 `playwright-mcp` 配合获得增强PDF转换
 
 ##### **convert_markdown_to_pdf**
 Markdown转PDF，自动添加水印（如果配置）。
@@ -352,7 +256,7 @@ Markdown转PDF，自动添加水印（如果配置）。
 - `includeTableOfContents` (boolean, 可选) - 是否包含目录，默认为`false`
 - `addQrCode` (boolean, 可选) - 是否添加二维码，默认为`false`
 
-**外部依赖：** 需要 `playwright-mcp` 进行PDF转换
+**可选集成：** 可与 `playwright-mcp` 配合获得增强PDF转换
 
 ##### **convert_markdown_to_html**
 Markdown转HTML。
@@ -378,152 +282,58 @@ HTML转Markdown。
 - `outputPath` (string, 可选) - 输出Markdown路径（不指定则自动生成）
 
 ##### **plan_conversion**
-转换计划生成，分析输入文件并生成转换建议。
+🎯 智能转换规划器 - 分析转换需求并生成最优转换方案。
 
 **参数：**
-- `inputPath` (string, 必需) - 输入文件路径
-- `outputPath` (string, 可选) - 输出文件路径
+- `sourceFormat` (string, 必需) - 源文件格式（pdf, docx, html, markdown, md, txt, doc）
+- `targetFormat` (string, 必需) - 目标文件格式（pdf, docx, html, markdown, md, txt, doc）
+- `sourceFile` (string, 可选) - 源文件路径（用于生成具体转换参数）
+- `preserveStyles` (boolean, 可选) - 是否保留样式格式，默认为`true`
+- `includeImages` (boolean, 可选) - 是否包含图片，默认为`true`
+- `theme` (string, 可选) - 转换主题，默认为`github`
+- `quality` (string, 可选) - 转换质量要求（fast, balanced, high），默认为`balanced`
 
-##### **rewrite_document**
-📝 智能文档改写工具 - 对现有文档进行内容改写、文本替换和格式调整。
-
-**功能特性：**
-- 支持多种文档格式的智能改写
-- 文本内容替换（支持正则表达式）
-- 格式保持改写和样式调整
-- 文档结构重组和内容优化
-- 批量改写规则应用
-
-**支持的改写格式：**
-- **直接改写**：MD、HTML（直接文本操作）
-- **转换改写**：DOCX → HTML → 改写 → DOCX
-- **智能改写**：自动识别格式并选择最佳改写策略
+##### **process_pdf_post_conversion**
+🔧 PDF后处理统一工具 - playwright-mcp的browser_pdf_save命令的必要后续步骤。
 
 **参数：**
-- `inputPath` (string, 必需) - 要改写的文档路径
-- `outputPath` (string, 可选) - 输出文件路径（不指定则覆盖原文件）
-- `rewriteRules` (array, 必需) - 改写规则列表：
-  - `type` (string) - 改写类型：`"replace"` | `"format"` | `"structure"`
-  - `oldText` (string) - 要替换的原文本
-  - `newText` (string) - 替换后的新文本
-  - `useRegex` (boolean, 可选) - 是否使用正则表达式，默认为`false`
-  - `preserveCase` (boolean, 可选) - 是否保持大小写，默认为`false`
-  - `preserveFormatting` (boolean, 可选) - 是否保留原格式，默认为`true`
-- `preserveOriginalFormat` (boolean, 可选) - 是否保持原始文档格式，默认为`true`
-- `backupOriginal` (boolean, 可选) - 是否备份原文件，默认为`false`
+- `playwrightPdfPath` (string, 必需) - playwright-mcp生成的PDF文件路径
+- `targetPath` (string, 可选) - 目标PDF文件路径（不指定则自动生成）
+- `addWatermark` (boolean, 可选) - 是否添加水印，默认为`false`
+- `addQrCode` (boolean, 可选) - 是否添加二维码，默认为`false`
+- `watermarkImage` (string, 可选) - 水印图片路径
+- `qrCodePath` (string, 可选) - 二维码图片路径
 
-**改写规则类型说明：**
-- **replace**：文本内容替换
-  - 支持普通文本和正则表达式替换
-  - 可配置大小写敏感性
-- **format**：格式标记调整
-  - 修改Markdown标记、HTML标签等
-  - 调整文档样式和排版
-- **structure**：结构重组
-  - 重新组织段落和章节
-  - 调整标题层级和内容顺序
+**功能：**
+1. 自动移动PDF从playwright临时路径到目标位置
+2. 统一添加水印和二维码
+3. 清理临时文件
 
-**使用示例：**
-```json
-{
-  "inputPath": "/path/to/document.md",
-  "outputPath": "/path/to/rewritten_document.md",
-  "rewriteRules": [
-    {
-      "type": "replace",
-      "oldText": "旧公司名称",
-      "newText": "新公司名称",
-      "preserveCase": true
-    },
-    {
-      "type": "format",
-      "oldText": "## (.*)",
-      "newText": "### $1",
-      "useRegex": true
-    }
-  ],
-  "preserveOriginalFormat": true,
-  "backupOriginal": true
-}
-```
 
-**注意事项：**
-- 改写操作会按照规则列表的顺序依次执行
-- 使用正则表达式时请确保表达式的安全性
-- 建议在重要文档改写前启用备份功能
-- 对于复杂格式文档（如DOCX），系统会自动选择最佳转换路径
 
-#### 网页抓取工具
+#### PDF 增强工具
 
-**⚠️ 法律和道德使用声明**：网页抓取工具应在遵守目标网站服务条款和相关法律法规的前提下使用。用户有责任：
-
-- 遵守 robots.txt 文件和网站抓取政策
-- 遵守数据保护和隐私法律（GDPR、CCPA 等）
-- 避免过度请求影响网站性能
-- 获得商业使用抓取数据的必要许可
-- 尊重知识产权和版权法
-
-此工具仅供合法的研究、开发和自动化目的使用。滥用这些工具可能导致法律后果。
-
-##### **take_screenshot**
-🖼️ 网页截图工具 - 使用Playwright Chromium捕获网页或HTML内容截图。
+##### **add_watermark**
+🎨 PDF水印添加工具 - 为PDF文档添加图片或文字水印。
 
 **参数：**
-- `urlOrHtml` (string, 必需) - 网页URL或HTML内容
-- `outputPath` (string, 必需) - 截图输出路径
-- `options` (object, 可选) - 截图选项：
-  - `width` (number) - 截图宽度
-  - `height` (number) - 截图高度
-  - `format` (string) - 图片格式，可选值：`["png", "jpeg"]`
-  - `quality` (number) - JPEG质量（1-100）
-  - `fullPage` (boolean) - 是否捕获完整页面
+- `pdfPath` (string, 必需) - PDF文件路径
+- `watermarkImage` (string, 可选) - 水印图片路径（PNG/JPG）
+- `watermarkText` (string, 可选) - 水印文字内容
+- `watermarkImageScale` (number, 可选) - 图片缩放比例，默认为`0.25`
+- `watermarkImageOpacity` (number, 可选) - 图片透明度，默认为`0.6`
+- `watermarkImagePosition` (string, 可选) - 图片位置，默认为`fullscreen`
 
-##### **document_preview_screenshot**
-📋 文档预览截图 - 将DOCX等文档转换为预览截图。
+##### **add_qrcode**
+📱 PDF二维码添加工具 - 为PDF文档添加二维码。
 
 **参数：**
-- `documentPath` (string, 必需) - 文档文件路径
-- `outputPath` (string, 必需) - 截图输出路径
-- `options` (object, 可选) - 截图选项：
-  - `width` (number) - 截图宽度
-  - `height` (number) - 截图高度
-  - `fullPage` (boolean) - 是否捕获完整页面
-
-##### **scrape_web_content**
-🕷️ 网页内容抓取 - 使用Playwright Chromium抓取网页内容。
-
-**参数：**
-- `url` (string, 必需) - 要抓取的网页URL
-- `options` (object, 可选) - 抓取选项：
-  - `waitForSelector` (string) - 等待的CSS选择器
-  - `timeout` (number) - 超时时间（毫秒）
-  - `textOnly` (boolean) - 仅提取纯文本内容
-
-##### **scrape_structured_data**
-📊 结构化数据抓取 - 使用CSS选择器从网页抓取结构化数据。
-
-**参数：**
-- `url` (string, 必需) - 要抓取的网页URL
-- `selector` (string, 必需) - CSS选择器
-- `options` (object, 可选) - 抓取选项：
-  - `timeout` (number) - 超时时间（毫秒）
-
-### 支持的格式转换
-| 从\到 | PDF | DOCX | HTML | Markdown |
-|---------|----|----- |------|----------|
-| **PDF** | ✅ | ❌ | ❌ | ❌ |
-| **DOCX** | ✅ | ✅ | ✅ | ✅ |
-| **HTML** | ✅ | ❌ | ✅ | ✅ |
-| **Markdown** | ✅ | ✅ | ✅ | ✅ |
-
-## 使用示例
-
-```
-将 /Users/docs/report.pdf 转换为 DOCX
-改写 /Users/docs/contract.md 中的公司名称
-批量替换 /Users/docs/manual.docx 中的术语
-调整 /Users/docs/article.html 的标题格式
-```
+- `pdfPath` (string, 必需) - PDF文件路径
+- `qrCodePath` (string, 可选) - 二维码图片路径
+- `qrScale` (number, 可选) - 二维码缩放比例，默认为`0.15`
+- `qrOpacity` (number, 可选) - 二维码透明度，默认为`1.0`
+- `qrPosition` (string, 可选) - 二维码位置，默认为`bottom-center`
+- `addText` (boolean, 可选) - 是否添加说明文字，默认为`true`
 
 ## 5. 性能指标
 
@@ -552,31 +362,38 @@ HTML转Markdown。
 
 ## 系统要求
 
-### 依赖项
+### 系统要求
 - **Node.js** ≥ 18.0.0
-- **零外部依赖** - 所有处理通过npm包实现
-- **可选**：playwright-mcp用于外部浏览器自动化
+- **零外部系统依赖** - 所有处理通过npm包实现
+- **可选集成**：playwright-mcp用于增强PDF转换
 
-### 纯JavaScript技术栈
-- **pdf-lib** - PDF操作
-- **mammoth** - DOCX处理  
-- **playwright** - 网页自动化
-- **marked** - Markdown处理
-- **exceljs** - 表格处理
+### 核心技术栈
+- **pdf-lib** - PDF操作和增强
+- **mammoth** - DOCX文档处理  
+- **marked** - Markdown解析和渲染
+- **cheerio** - HTML解析和操作
+- **turndown** - HTML到Markdown转换
+- **docx** - DOCX文档生成
 
 ### 安装
 ```bash
-# 仅需Node.js
+# 全局安装
 npm install -g doc-ops-mcp
+
+# 或使用 pnpm
+pnpm add -g doc-ops-mcp
+
+# 或使用 bun
+bun add -g doc-ops-mcp
 ```
 
-### 组件说明
+### 架构组件
 
 - **MCP服务器核心**: 处理JSON-RPC 2.0通信和工具注册
-- **工具路由器**: 将请求路由至相应处理模块
-- **处理引擎**: 包含针对不同文档类型的专用处理器
-- **数据处理层**: 用于文档操作的纯JavaScript库
-- **零外部依赖**: 所有处理通过npm包完成
+- **智能路由器**: 将请求路由至最优处理模块
+- **转换引擎**: 包含针对不同文档类型的专用转换器
+- **样式处理器**: 确保格式转换中的样式保留
+- **安全模块**: 提供路径验证和内容安全处理
 
 ## 6. 开源协议
 
