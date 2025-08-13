@@ -816,6 +816,17 @@ docker logs -f doc-ops-mcp
 4. **推送到分支** (`git push origin feature/AmazingFeature`)
 5. **创建 Pull Request**
 
+#### 知识产权授权
+
+**通过提交 Pull Request，您同意所有通过 Pull Request 提交的贡献都将在 MIT 许可证下授权。** 这意味着：
+
+- 您授予项目维护者和用户在 MIT 许可证下使用、修改和分发您的贡献的权利
+- 您确认您有权进行这些贡献
+- 您理解您的贡献将成为开源项目的一部分
+- 您放弃对贡献代码的独占所有权声明
+
+如果您不能同意这些条款，请不要提交 Pull Request。
+
 ### 代码规范
 
 - 使用 TypeScript
