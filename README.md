@@ -12,7 +12,7 @@
 
 1. [Quick Start](#1-quick-start)
 2. [System Architecture](#2-system-architecture)
-3. [External Dependencies](#3-external-dependencies)
+3. [Optional Integration](#3-optional-integration)
 4. [Features](#4-features)
 5. [Performance Metrics](#5-performance-metrics)
 6. [Open Source Licenses](#6-open-source-licenses)
@@ -142,170 +142,28 @@ Document Operations MCP Server adopts a hybrid architecture design, combining in
 
 **Important Note**: All PDF conversion features require `playwright-mcp` to work properly.
 
-## 3. External Dependencies
+## 3. Optional Integration
 
-### playwright-mcp Dependency
+This server can work with `playwright-mcp` for enhanced PDF conversion capabilities. Please refer to the official `playwright-mcp` documentation for detailed configuration.
 
-This MCP server's PDF conversion functionality depends on the `playwright-mcp` server:
+### 🔧 PDF Conversion Workflow
 
-- **Dependent Tools**: `convert_docx_to_pdf`, `convert_markdown_to_pdf`
-- **Important Configuration**: `playwright-mcp` must use `--caps=pdf` parameter to provide `browser_pdf_save` command
-- **Conversion Flow**:
-  1. Convert source document to HTML format
-  2. Use `playwright-mcp`'s `browser_pdf_save` command to render HTML to PDF
-  3. Automatically add watermark (if `WATERMARK_IMAGE` is configured)
-  4. Optionally add QR code (if `addQrCode=true` and `QR_CODE_IMAGE` is configured)
-
-#### Third-Party Dependency Disclaimer
-
-**Important Notice**: `playwright-mcp` is an independent third-party project. This project (doc-ops-mcp) does not assume responsibility for:
-
-- The availability, security, or behavior of `playwright-mcp`
-- Any issues, vulnerabilities, or data loss caused by `playwright-mcp`
-- The maintenance, updates, or support of `playwright-mcp`
-
-**Users must:**
-- Review and comply with `playwright-mcp`'s own license terms and conditions
-- Understand the risks associated with using third-party dependencies
-- Ensure `playwright-mcp` meets their security and compliance requirements
-- Monitor `playwright-mcp` for updates and security patches independently
-
-Please refer to the official `playwright-mcp` documentation and repository for license information, security advisories, and usage guidelines.
-
-### Configuration Requirements
-
-1. **Install playwright-mcp**:
-   ```bash
-   # Please refer to playwright-mcp official documentation for installation and configuration
-   ```
-
-2. **MCP Client Configuration**:
-   Ensure both this server and `playwright-mcp` are configured in your MCP client
-   
-   **Important**: `playwright-mcp` must use `--caps=pdf` parameter:
-   ```json
-   {
-     "mcpServers": {
-       "playwright": {
-         "command": "npx",
-         "args": ["@playwright/mcp@latest", "--caps=pdf"]
-       }
-     }
-   }
-   ```
-
-3. **Environment Variables**:
-   - `WATERMARK_IMAGE`: Watermark image path (optional, automatically added during PDF conversion)
-   - `QR_CODE_IMAGE`: QR code image path (optional, added when requested)
-
-## PDF Conversion Workflow
-
-When converting documents to PDF, `doc-ops-mcp` follows this workflow:
-
-1. **HTML Generation Stage**: Convert source documents (like Markdown, DOCX) to styled HTML files
-2. **PDF Generation Stage**: Call `playwright-mcp`'s `browser_pdf_save` command to convert HTML to PDF
-3. **Post-processing Stage**: **Must** call `process_pdf_post_conversion` tool to complete path conversion, watermark and QR code addition
-
-### Important Configuration Requirements
-
-⚠️ **Critical Note**: `playwright-mcp` must be started with `--caps=pdf` parameter to provide `browser_pdf_save` command.
-
-### 🔧 PDF Post-processing Workflow (Important)
-
-**When using `playwright-mcp` to generate PDF, you must follow these steps:**
-
-1. Use `playwright-mcp`'s `browser_pdf_save` command to generate PDF (saved in temporary directory)
-2. **Immediately call** `doc-ops-mcp`'s `process_pdf_post_conversion` tool:
-   - Automatically move PDF from temporary path to target location
-   - Add watermark and QR code based on environment variables or parameters
-   - Clean up temporary files
-
-**Example Workflow:**
-```
-1. playwright-mcp:browser_pdf_save -> Generate temporary PDF: /tmp/playwright-output/file.pdf
-2. doc-ops-mcp:process_pdf_post_conversion -> Process and save to: /output/final.pdf
-```
-
-⚠️ **Critical Note**: After using `playwright-mcp` to generate PDF, you must immediately call `doc-ops-mcp`'s `process_pdf_post_conversion` tool to complete final processing.
-
-### 🤖 AI Model Workflow Guidance
-
-**To ensure AI models correctly execute PDF conversion post-processing, follow these guidelines:**
-
-#### 1. Tool Call Sequence Constraints
-- When PDF generation is needed, tools must be called in this order:
-  1. First generate HTML file (using appropriate conversion tools)
-  2. Then call `playwright-mcp:browser_pdf_save` to generate PDF
-  3. **Immediately** call `doc-ops-mcp:process_pdf_post_conversion` to complete post-processing
-
-#### 2. Key Information in Tool Descriptions
-- The `process_pdf_post_conversion` tool description clearly states "⚠️ Important: This is a necessary follow-up step for playwright-mcp's browser_pdf_save command!"
-- AI models should recognize this key information and automatically execute the follow-up steps
-
-#### 3. Recommended Prompt Patterns
-When users request PDF conversion, use this approach:
-```
-User request: Convert Markdown to PDF
-Execution steps:
-1. Use convert_markdown_to_html to generate HTML
-2. Use playwright-mcp:browser_pdf_save to generate PDF
-3. Use process_pdf_post_conversion to complete final processing
-```
-
-#### 4. Automated Workflow
-- AI models should treat `playwright-mcp:browser_pdf_save` and `process_pdf_post_conversion` as an atomic operation
-- Should not wait for user confirmation between the two steps
-- Should automatically pass correct file path parameters
-
-#### 5. Complete Example Workflow
-
-**Scenario: User requests converting `document.md` to PDF**
-
-```json
-// Step 1: Convert Markdown to HTML
-{
-  "tool": "doc-ops-mcp:convert_markdown_to_html",
-  "params": {
-    "markdownPath": "/path/to/document.md",
-    "theme": "github"
-  }
-}
-// Result: Generate /output/document.html
-
-// Step 2: Use playwright-mcp to generate PDF
-{
-  "tool": "playwright-mcp:browser_pdf_save",
-  "params": {
-    "url": "file:///output/document.html",
-    "path": "/tmp/playwright-output/document.pdf"
-  }
-}
-// Result: Generate temporary PDF /tmp/playwright-output/document.pdf
-
-// Step 3: Immediately call post-processing tool (Required!)
-{
-  "tool": "doc-ops-mcp:process_pdf_post_conversion",
-  "params": {
-    "playwrightPdfPath": "/tmp/playwright-output/document.pdf",
-    "targetPath": "document.pdf",
-    "addWatermark": true,
-    "addQrCode": true
-  }
-}
-// Result: Final PDF saved to /output/document.pdf with watermark and QR code
-```
-
-**Key Points:**
-- No interruption allowed between Step 2 and Step 3
-- `playwrightPdfPath` must be the exact path generated in Step 2
-- Watermark and QR code will be automatically added if environment variables are set
+This server supports complete PDF conversion functionality:
+1. **Document Parsing**: Use OOXML parser to ensure complete style preservation
+2. **Format Conversion**: Convert documents to high-quality HTML format
+3. **PDF Generation**: Built-in converter or optionally work with `playwright-mcp`
+4. **Enhancement Processing**: Automatically add watermarks and QR codes (if configured)
 
 ### How It Works
 
-When performing PDF conversion, this server will:
-1. Process the source document and generate HTML
-2. Call `playwright-mcp` tools for HTML → PDF conversion
-3. Use `process_pdf_post_conversion` to post-process the generated PDF (path movement, watermark, QR code)
+This server uses intelligent conversion architecture:
+1. **Smart Planning**: `plan_conversion` analyzes conversion requirements and selects optimal paths
+2. **Format Conversion**: Use specialized converters to handle various document formats
+3. **Style Preservation**: Ensure style integrity through OOXML parser
+4. **Enhancement Processing**: Automatically add watermarks, QR codes and other enhancements
+5. **Optional Integration**: Support working with `playwright-mcp` for enhanced capabilities
+
+
 
 ## 4. Features
 

@@ -244,8 +244,6 @@ DOCX转PDF，自动添加水印（如果配置）。
 - `preserveFormatting` (boolean, 可选) - 保留原始格式，默认为`true`
 - `chineseFont` (string, 可选) - 中文字体，默认为`Microsoft YaHei`
 
-**可选集成：** 可与 `playwright-mcp` 配合获得增强PDF转换
-
 ##### **convert_markdown_to_pdf**
 Markdown转PDF，自动添加水印（如果配置）。
 
@@ -255,8 +253,6 @@ Markdown转PDF，自动添加水印（如果配置）。
 - `theme` (string, 可选) - 主题样式，默认为`"github"`
 - `includeTableOfContents` (boolean, 可选) - 是否包含目录，默认为`false`
 - `addQrCode` (boolean, 可选) - 是否添加二维码，默认为`false`
-
-**可选集成：** 可与 `playwright-mcp` 配合获得增强PDF转换
 
 ##### **convert_markdown_to_html**
 Markdown转HTML。
@@ -294,20 +290,14 @@ HTML转Markdown。
 - `quality` (string, 可选) - 转换质量要求（fast, balanced, high），默认为`balanced`
 
 ##### **process_pdf_post_conversion**
-🔧 PDF后处理统一工具 - playwright-mcp的browser_pdf_save命令的必要后续步骤。
 
 **参数：**
-- `playwrightPdfPath` (string, 必需) - playwright-mcp生成的PDF文件路径
+- `playwrightPdfPath` (string, 必需) -生成的PDF文件路径
 - `targetPath` (string, 可选) - 目标PDF文件路径（不指定则自动生成）
 - `addWatermark` (boolean, 可选) - 是否添加水印，默认为`false`
 - `addQrCode` (boolean, 可选) - 是否添加二维码，默认为`false`
 - `watermarkImage` (string, 可选) - 水印图片路径
 - `qrCodePath` (string, 可选) - 二维码图片路径
-
-**功能：**
-1. 自动移动PDF从playwright临时路径到目标位置
-2. 统一添加水印和二维码
-3. 清理临时文件
 
 
 
@@ -348,7 +338,7 @@ HTML转Markdown。
 
 ### 转换性能
 
-- **PDF 转换**：依赖 playwright-mcp，速度约 1-3 页/秒
+- **PDF 转换**：需要配合 playwright-mcp 工具使用，速度约 1-3 页/秒
 - **DOCX 转换**：纯 JavaScript 处理，速度约 5-15 页/秒
 - **HTML 转换**：最快，速度约 20-50 页/秒
 - **并发处理**：支持最多 5 个并发任务
@@ -408,7 +398,6 @@ bun add -g doc-ops-mcp
 | **pdf-lib** | ^1.17.1 | MIT | PDF 文档操作和处理 |
 | **mammoth** | ^1.6.0 | BSD-2-Clause | DOCX 文档解析和转换 |
 | **marked** | ^9.1.6 | MIT | Markdown 解析和渲染 |
-| **playwright** | ^1.40.0 | Apache-2.0 | 浏览器自动化（可选） |
 | **exceljs** | ^4.4.0 | MIT | Excel 文件处理 |
 | **jsdom** | ^23.0.1 | MIT | HTML DOM 操作 |
 | **turndown** | ^7.1.2 | MIT | HTML 转 Markdown |
