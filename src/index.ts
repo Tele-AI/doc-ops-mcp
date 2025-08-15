@@ -20,13 +20,38 @@ const {
   escapeHtml,
   sanitizeCssProperty,
   defaultSecurityConfig,
-} = require('./security/securityConfig.js');
+} = require('./security/securityConfig');
 
-// 路径安全验证函数 - 移除路径限制，允许访问任意目录
+// 路径安全验证函数 - 确保路径在允许的目录内
 function validatePath(inputPath: string, allowedBasePaths: string[] = []): string {
-  // 简单的路径解析，不进行安全限制
   const path = require('path');
-  return path.resolve(inputPath);
+  const resolvedPath = path.resolve(inputPath);
+  
+  // 获取当前的资源路径配置
+  const resourcePaths = getDefaultResourcePaths();
+  
+  // 默认允许的基础路径
+  const defaultAllowedPaths = [
+    resourcePaths.outputDir,
+    resourcePaths.cacheDir,
+    resourcePaths.tempDir,
+    process.cwd(), // 当前工作目录
+  ];
+  
+  const allAllowedPaths = [...defaultAllowedPaths, ...allowedBasePaths];
+  
+  // 检查路径是否在允许的目录内
+  const isAllowed = allAllowedPaths.some(allowedPath => {
+    if (!allowedPath) return false;
+    const resolvedAllowedPath = path.resolve(allowedPath);
+    return resolvedPath.startsWith(resolvedAllowedPath);
+  });
+  
+  if (!isAllowed) {
+    throw new Error(`Path is not within allowed directories: ${resolvedPath}. Allowed paths: ${allAllowedPaths.filter(p => p).join(', ')}`);
+  }
+  
+  return resolvedPath;
 }
 
 
@@ -481,10 +506,19 @@ async function readDocument(filePath: string, options: ReadDocumentOptions = {})
 
 
 // Helper functions for writeDocument
-function resolveFinalOutputPath(outputPath?: string): string {
+function resolveFinalOutputPath(outputPath?: string, content?: string): string {
   if (!outputPath) {
     const outputDir = defaultResourcePaths.outputDir;
-    return path.join(outputDir, `output_${Date.now()}.txt`);
+    // 智能检测内容类型并设置合适的扩展名
+    let extension = '.txt';
+    if (content) {
+      if (content.includes('<!DOCTYPE html>') || content.includes('<html') || content.includes('<body')) {
+        extension = '.html';
+      } else if (content.includes('# ') || content.includes('## ') || content.includes('```')) {
+        extension = '.md';
+      }
+    }
+    return path.join(outputDir, `output_${Date.now()}${extension}`);
   } else if (!path.isAbsolute(outputPath)) {
     // 如果是相对路径，基于环境变量的输出目录
     return path.join(defaultResourcePaths.outputDir, outputPath);
@@ -507,7 +541,7 @@ async function writeDocument(
   options: WriteDocumentOptions = {}
 ) {
   try {
-    const finalPath = resolveFinalOutputPath(outputPath);
+    const finalPath = resolveFinalOutputPath(outputPath, content);
     const encoding = options.encoding ?? 'utf-8';
 
     const validatedFinalPath = validatePath(finalPath);
@@ -817,7 +851,25 @@ async function performGenericConversion(inputPath: string, finalOutputPath: stri
     content = applyTextReplacements(content, options.textReplacements);
   }
 
-  // Write the converted content
+  // 检查输出格式，如果是 DOCX，使用专门的转换器
+  const outputExt = path.extname(finalOutputPath).toLowerCase();
+  if (outputExt === '.docx') {
+    // 如果内容是 HTML 格式，使用 HTML 到 DOCX 转换器
+    if (content.includes('<html') || content.includes('<!DOCTYPE')) {
+      return await convertHtmlToDocxSpecial(inputPath, finalOutputPath, options);
+    } else {
+      // 对于其他格式，先转换为 HTML，再转换为 DOCX
+      const tempHtmlPath = finalOutputPath.replace('.docx', '.html');
+      const htmlWriteResult = await writeDocument(content, tempHtmlPath);
+      if (htmlWriteResult.success && htmlWriteResult.outputPath) {
+        return await convertHtmlToDocxSpecial(htmlWriteResult.outputPath, finalOutputPath, options);
+      } else {
+        return htmlWriteResult;
+      }
+    }
+  }
+
+  // 对于其他格式，直接写入文件
   return await writeDocument(content, finalOutputPath);
 }
 
@@ -829,6 +881,17 @@ async function convertDocument(
 ) {
   try {
     const { finalOutputPath, inputExt, outputExt } = resolveConvertOutputPath(inputPath, outputPath, options.targetFormat);
+    
+    // 防止循环调用：如果输入和输出格式相同，直接复制文件
+    if (inputExt === outputExt) {
+      const inputContent = await fs.readFile(inputPath, 'utf-8');
+      await fs.writeFile(finalOutputPath, inputContent, 'utf-8');
+      return {
+        success: true,
+        outputPath: finalOutputPath,
+        message: `文件已复制到 ${finalOutputPath}（格式相同，无需转换）`,
+      };
+    }
 
     // Handle special conversion cases
     if (inputExt === '.html' && outputExt === '.md') {
@@ -2619,6 +2682,69 @@ async function convertDocxToTxt(inputPath: string, outputPath?: string, options:
   }
 }
 
+// 创建 Word 文档函数 - 直接从内容创建，避免循环调用
+async function createWordDocument(
+  content: string,
+  outputPath?: string,
+  options: any = {}
+) {
+  try {
+    // 解析输出路径
+    let finalOutputPath = outputPath;
+    if (!finalOutputPath) {
+      const timestamp = Date.now();
+      const title = options.title || 'Document';
+      const safeName = title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
+      finalOutputPath = path.join(defaultResourcePaths.outputDir, `${safeName}_${timestamp}.docx`);
+    } else if (!path.isAbsolute(finalOutputPath)) {
+      finalOutputPath = path.join(defaultResourcePaths.outputDir, finalOutputPath);
+    }
+
+    // 确保输出目录存在
+    await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
+
+    // 如果内容不是 HTML 格式，包装为 HTML
+    let htmlContent = content;
+    if (!content.includes('<html') && !content.includes('<!DOCTYPE')) {
+      htmlContent = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>${options.title || 'Document'}</title>
+</head>
+<body>
+${content}
+</body>
+</html>`;
+    }
+
+    // 使用增强的 HTML 到 DOCX 转换器
+    const converter = new EnhancedHtmlToDocxConverter();
+    const docxBuffer = await converter.convertHtmlToDocx(htmlContent);
+    
+    // 写入文件
+    await fs.writeFile(finalOutputPath, docxBuffer);
+
+    console.error(`✅ Word 文档创建成功: ${finalOutputPath}`);
+    return {
+      success: true,
+      outputPath: finalOutputPath,
+      message: 'Word 文档创建完成',
+      metadata: {
+        converter: 'EnhancedHtmlToDocxConverter',
+        stylesPreserved: options.preserveFormatting !== false,
+        fileSize: docxBuffer.length,
+      },
+    };
+  } catch (error: any) {
+    console.error('❌ Word 文档创建失败:', error.message);
+    return {
+      success: false,
+      error: error.message,
+    };
+  }
+}
+
 // Markdown 转 TXT 函数
 async function convertMarkdownToTxt(inputPath: string, outputPath?: string, options: any = {}) {
   try {
@@ -2736,7 +2862,7 @@ const TOOL_DEFINITIONS = {
   convert_document: {
     name: 'convert_document',
     description:
-      "Convert documents between formats with enhanced style preservation. Output directory is controlled by OUTPUT_DIR environment variable. All output files will be saved to the directory specified by OUTPUT_DIR. ⚠️ IMPORTANT: For Markdown to HTML conversion with style preservation, use 'convert_markdown_to_html' tool instead for better results with themes and styling.",
+      "Convert documents between formats with enhanced style preservation. Output directory is controlled by OUTPUT_DIR environment variable. All output files will be saved to the directory specified by OUTPUT_DIR. ⚠️ IMPORTANT: For Markdown to HTML conversion with style preservation, use 'convert_markdown_to_html' tool instead for better results with themes and styling. For creating Word documents from content, use 'create_word_document' tool to avoid conversion loops.",
     inputSchema: {
       type: 'object',
       properties: {
@@ -2942,6 +3068,30 @@ const TOOL_DEFINITIONS = {
     },
   },
 
+  create_word_document: {
+    name: 'create_word_document',
+    description:
+      'Create a Word document directly from content with beautiful formatting. This tool is specifically designed for creating Word documents from scratch, avoiding conversion loops. Supports HTML content with automatic styling and formatting.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', description: 'Content to write to Word document (supports HTML)' },
+        outputPath: {
+          type: 'string',
+          description:
+            'DOCX output path (optional, auto-generated). If not absolute, will be resolved relative to OUTPUT_DIR environment variable.',
+        },
+        title: { type: 'string', description: 'Document title', default: 'Document' },
+        preserveFormatting: {
+          type: 'boolean',
+          description: 'Preserve HTML formatting and styles',
+          default: true,
+        },
+      },
+      required: ['content'],
+    },
+  },
+
   convert_html_to_markdown: {
     name: 'convert_html_to_markdown',
     description:
@@ -3085,6 +3235,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     TOOL_DEFINITIONS.convert_markdown_to_docx,
     TOOL_DEFINITIONS.convert_markdown_to_pdf,
     TOOL_DEFINITIONS.convert_html_to_markdown,
+    TOOL_DEFINITIONS.create_word_document,
     TOOL_DEFINITIONS.plan_conversion,
     TOOL_DEFINITIONS.process_pdf_post_conversion,
 
@@ -3152,7 +3303,7 @@ async function handleToolCall(name: string, args: any) {
 
 // 检查是否为基础文档操作
 function isBasicDocumentOperation(name: string): boolean {
-  return ['read_document', 'write_document', 'convert_document'].includes(name);
+  return ['read_document', 'write_document', 'convert_document', 'create_word_document'].includes(name);
 }
 
 // 检查是否为PDF操作
@@ -3183,6 +3334,8 @@ async function handleBasicDocumentOperations(name: string, args: any) {
       // 传递 targetFormat 参数
       const convertOptions = { ...args, targetFormat: args.targetFormat };
       return await convertDocument(args.inputPath, args.outputPath, convertOptions);
+    case 'create_word_document':
+      return await createWordDocument(args.content, args.outputPath, args);
     default:
       throw new Error(`Unknown basic document operation: ${name}`);
   }
