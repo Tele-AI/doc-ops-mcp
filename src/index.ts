@@ -228,6 +228,8 @@ interface ReadDocumentOptions {
 
 interface WriteDocumentOptions {
   encoding?: string;
+  title?: string;
+  format?: 'html' | 'md' | 'txt' | 'docx';
 }
 
 interface ConvertDocumentOptions {
@@ -506,19 +508,38 @@ async function readDocument(filePath: string, options: ReadDocumentOptions = {})
 
 
 // Helper functions for writeDocument
-function resolveFinalOutputPath(outputPath?: string, content?: string): string {
+function resolveFinalOutputPath(outputPath?: string, content?: string, format?: string, title?: string): string {
   if (!outputPath) {
     const outputDir = defaultResourcePaths.outputDir;
-    // 智能检测内容类型并设置合适的扩展名
+    
+    // 优先使用指定的格式，其次智能检测内容类型
     let extension = '.txt';
-    if (content) {
+    if (format) {
+      const formatToExt: Record<string, string> = {
+        'html': '.html',
+        'md': '.md',
+        'txt': '.txt',
+        'docx': '.docx'
+      };
+      extension = formatToExt[format] || '.txt';
+    } else if (content) {
       if (content.includes('<!DOCTYPE html>') || content.includes('<html') || content.includes('<body')) {
         extension = '.html';
       } else if (content.includes('# ') || content.includes('## ') || content.includes('```')) {
         extension = '.md';
       }
     }
-    return path.join(outputDir, `output_${Date.now()}${extension}`);
+    
+    // 使用标题生成文件名，如果没有标题则使用时间戳
+    let filename;
+    if (title) {
+      const safeName = title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5]/g, '_');
+      filename = `${safeName}_${Date.now()}${extension}`;
+    } else {
+      filename = `output_${Date.now()}${extension}`;
+    }
+    
+    return path.join(outputDir, filename);
   } else if (!path.isAbsolute(outputPath)) {
     // 如果是相对路径，基于环境变量的输出目录
     return path.join(defaultResourcePaths.outputDir, outputPath);
@@ -541,7 +562,16 @@ async function writeDocument(
   options: WriteDocumentOptions = {}
 ) {
   try {
-    const finalPath = resolveFinalOutputPath(outputPath, content);
+    // 支持新的参数格式
+    const title = options.title || 'Document';
+    const format = options.format;
+    
+    // 如果指定了 DOCX 格式，使用 createWordDocument 函数
+    if (format === 'docx') {
+      return await createWordDocument(content, outputPath, { title, ...options });
+    }
+    
+    const finalPath = resolveFinalOutputPath(outputPath, content, format, title);
     const encoding = options.encoding ?? 'utf-8';
 
     const validatedFinalPath = validatePath(finalPath);
@@ -550,7 +580,7 @@ async function writeDocument(
     return {
       success: true,
       outputPath: validatedFinalPath,
-      message: `Document written successfully to ${finalPath}. Output directory controlled by OUTPUT_DIR environment variable: ${defaultResourcePaths.outputDir}`,
+      message: `Document written successfully to ${validatedFinalPath}. Output directory controlled by OUTPUT_DIR environment variable: ${defaultResourcePaths.outputDir}`,
     };
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -2322,7 +2352,7 @@ async function addQRCode(pdfPath: string, qrCodePath?: string, options: QRCodeOp
 
 // Helper functions for processPdfPostConversion
 function resolvePostProcessingPath(playwrightPdfPath: string, targetPath?: string): string {
-  const outputDir = process.env.OUTPUT_DIR ?? path.dirname(playwrightPdfPath);
+  const outputDir = defaultResourcePaths.outputDir;
   
   if (!targetPath) {
     // Extract original filename from playwright path
@@ -2843,17 +2873,14 @@ const TOOL_DEFINITIONS = {
   write_document: {
     name: 'write_document',
     description:
-      'Write content to document files in specified formats. Output directory is controlled by OUTPUT_DIR environment variable. If outputPath is not provided, files will be saved to OUTPUT_DIR with auto-generated names. If outputPath is relative, it will be resolved relative to OUTPUT_DIR.',
+      'Write content to document files in specified formats. Output directory is controlled by OUTPUT_DIR environment variable. Files will be automatically saved to OUTPUT_DIR with auto-generated names based on content type (HTML, Markdown, or plain text). Supports intelligent format detection.',
     inputSchema: {
       type: 'object',
       properties: {
         content: { type: 'string', description: 'Content to write' },
-        outputPath: {
-          type: 'string',
-          description:
-            'Output file path (optional, auto-generated). If not absolute, will be resolved relative to OUTPUT_DIR environment variable.',
-        },
         encoding: { type: 'string', description: 'File encoding', default: 'utf-8' },
+        title: { type: 'string', description: 'Document title (optional, used for filename generation)' },
+        format: { type: 'string', description: 'Force specific format: html, md, txt, docx (optional, auto-detected if not specified)', enum: ['html', 'md', 'txt', 'docx'] },
       },
       required: ['content'],
     },
@@ -2862,16 +2889,12 @@ const TOOL_DEFINITIONS = {
   convert_document: {
     name: 'convert_document',
     description:
-      "Convert documents between formats with enhanced style preservation. Output directory is controlled by OUTPUT_DIR environment variable. All output files will be saved to the directory specified by OUTPUT_DIR. ⚠️ IMPORTANT: For Markdown to HTML conversion with style preservation, use 'convert_markdown_to_html' tool instead for better results with themes and styling. For creating Word documents from content, use 'create_word_document' tool to avoid conversion loops.",
+      "Convert documents between formats with enhanced style preservation. Output directory is controlled by OUTPUT_DIR environment variable. All output files will be automatically saved to the directory specified by OUTPUT_DIR with auto-generated names. ⚠️ IMPORTANT: For Markdown to HTML conversion with style preservation, use 'convert_markdown_to_html' tool instead for better results with themes and styling. For creating Word documents from content, use 'create_word_document' tool to avoid conversion loops.",
     inputSchema: {
       type: 'object',
       properties: {
         inputPath: { type: 'string', description: 'Input file path' },
-        outputPath: {
-          type: 'string',
-          description:
-            'Output file path (optional, auto-generated). If not absolute, will be resolved relative to OUTPUT_DIR environment variable.',
-        },
+        targetFormat: { type: 'string', description: 'Target format: pdf, html, docx, markdown, md, txt (optional, auto-detected from input if not specified)' },
         preserveFormatting: { type: 'boolean', description: 'Preserve formatting', default: true },
         useInternalPlaywright: {
           type: 'boolean',
@@ -2940,16 +2963,11 @@ const TOOL_DEFINITIONS = {
   convert_docx_to_pdf: {
     name: 'convert_docx_to_pdf',
     description:
-      'Enhanced DOCX to PDF conversion with perfect Word style replication and Playwright integration. Automatically adds watermark if WATERMARK_IMAGE environment variable is set. QR code can be added by setting addQrCode=true (requires QR_CODE_IMAGE environment variable). Output directory is controlled by OUTPUT_DIR environment variable.',
+      'Enhanced DOCX to PDF conversion with perfect Word style replication and Playwright integration. Automatically adds watermark if WATERMARK_IMAGE environment variable is set. QR code can be added by setting addQrCode=true (requires QR_CODE_IMAGE environment variable). Output directory is controlled by OUTPUT_DIR environment variable. Files will be automatically saved to OUTPUT_DIR with auto-generated names.',
     inputSchema: {
       type: 'object',
       properties: {
         docxPath: { type: 'string', description: 'DOCX file path to convert' },
-        outputPath: {
-          type: 'string',
-          description:
-            'PDF output path (optional, auto-generated). If not absolute, will be resolved relative to OUTPUT_DIR environment variable.',
-        },
         preserveFormatting: {
           type: 'boolean',
           description: 'Preserve original formatting',
@@ -2973,16 +2991,11 @@ const TOOL_DEFINITIONS = {
   convert_markdown_to_html: {
     name: 'convert_markdown_to_html',
     description:
-      'Enhanced Markdown to HTML conversion with beautiful styling and theme support. Supports GitHub, Academic, Modern, and Default themes with complete style preservation.',
+      'Enhanced Markdown to HTML conversion with beautiful styling and theme support. Supports GitHub, Academic, Modern, and Default themes with complete style preservation. Output directory is controlled by OUTPUT_DIR environment variable. Files will be automatically saved to OUTPUT_DIR with auto-generated names.',
     inputSchema: {
       type: 'object',
       properties: {
         markdownPath: { type: 'string', description: 'Markdown file path to convert' },
-        outputPath: {
-          type: 'string',
-          description:
-            'HTML output path (optional, auto-generated). If not absolute, will be resolved relative to OUTPUT_DIR environment variable.',
-        },
         theme: {
           type: 'string',
           enum: ['default', 'github', 'academic', 'modern'],
@@ -3003,16 +3016,11 @@ const TOOL_DEFINITIONS = {
   convert_markdown_to_docx: {
     name: 'convert_markdown_to_docx',
     description:
-      'Enhanced Markdown to DOCX conversion with professional styling and theme support. Preserves formatting, supports tables, lists, headings, and inline formatting with beautiful Word document output.',
+      'Enhanced Markdown to DOCX conversion with professional styling and theme support. Preserves formatting, supports tables, lists, headings, and inline formatting with beautiful Word document output. Output directory is controlled by OUTPUT_DIR environment variable. Files will be automatically saved to OUTPUT_DIR with auto-generated names.',
     inputSchema: {
       type: 'object',
       properties: {
         markdownPath: { type: 'string', description: 'Markdown file path to convert' },
-        outputPath: {
-          type: 'string',
-          description:
-            'DOCX output path (optional, auto-generated). If not absolute, will be resolved relative to OUTPUT_DIR environment variable.',
-        },
         theme: {
           type: 'string',
           enum: ['default', 'professional', 'academic', 'modern'],
@@ -3037,16 +3045,11 @@ const TOOL_DEFINITIONS = {
   convert_markdown_to_pdf: {
     name: 'convert_markdown_to_pdf',
     description:
-      'Enhanced Markdown to PDF conversion with beautiful styling and theme support. Automatically adds watermark if WATERMARK_IMAGE environment variable is set. QR code can be added by setting addQrCode=true (requires QR_CODE_IMAGE environment variable). Requires playwright-mcp for final PDF generation.',
+      'Enhanced Markdown to PDF conversion with beautiful styling and theme support. Automatically adds watermark if WATERMARK_IMAGE environment variable is set. QR code can be added by setting addQrCode=true (requires QR_CODE_IMAGE environment variable). Requires playwright-mcp for final PDF generation. Output directory is controlled by OUTPUT_DIR environment variable. Files will be automatically saved to OUTPUT_DIR with auto-generated names.',
     inputSchema: {
       type: 'object',
       properties: {
         markdownPath: { type: 'string', description: 'Markdown file path to convert' },
-        outputPath: {
-          type: 'string',
-          description:
-            'PDF output path (optional, auto-generated). If not absolute, will be resolved relative to OUTPUT_DIR environment variable.',
-        },
         theme: {
           type: 'string',
           enum: ['default', 'github', 'academic', 'modern'],
@@ -3071,16 +3074,11 @@ const TOOL_DEFINITIONS = {
   create_word_document: {
     name: 'create_word_document',
     description:
-      'Create a Word document directly from content with beautiful formatting. This tool is specifically designed for creating Word documents from scratch, avoiding conversion loops. Supports HTML content with automatic styling and formatting.',
+      'Create a Word document directly from content with beautiful formatting. This tool is specifically designed for creating Word documents from scratch, avoiding conversion loops. Supports HTML content with automatic styling and formatting. Output directory is controlled by OUTPUT_DIR environment variable. Files will be automatically saved to OUTPUT_DIR with auto-generated names.',
     inputSchema: {
       type: 'object',
       properties: {
         content: { type: 'string', description: 'Content to write to Word document (supports HTML)' },
-        outputPath: {
-          type: 'string',
-          description:
-            'DOCX output path (optional, auto-generated). If not absolute, will be resolved relative to OUTPUT_DIR environment variable.',
-        },
         title: { type: 'string', description: 'Document title', default: 'Document' },
         preserveFormatting: {
           type: 'boolean',
@@ -3095,16 +3093,11 @@ const TOOL_DEFINITIONS = {
   convert_html_to_markdown: {
     name: 'convert_html_to_markdown',
     description:
-      'Enhanced HTML to Markdown conversion with style preservation. Converts HTML files to clean Markdown format while preserving structure, links, images, tables, and formatting. Output directory is controlled by OUTPUT_DIR environment variable.',
+      'Enhanced HTML to Markdown conversion with style preservation. Converts HTML files to clean Markdown format while preserving structure, links, images, tables, and formatting. Output directory is controlled by OUTPUT_DIR environment variable. Files will be automatically saved to OUTPUT_DIR with auto-generated names.',
     inputSchema: {
       type: 'object',
       properties: {
         htmlPath: { type: 'string', description: 'HTML file path to convert' },
-        outputPath: {
-          type: 'string',
-          description:
-            'Markdown output path (optional, auto-generated). If not absolute, will be resolved relative to OUTPUT_DIR environment variable.',
-        },
         preserveStyles: {
           type: 'boolean',
           description: 'Preserve HTML formatting and styles',
@@ -3329,13 +3322,13 @@ async function handleBasicDocumentOperations(name: string, args: any) {
     case 'read_document':
       return await readDocument(args.filePath, args);
     case 'write_document':
-      return await writeDocument(args.content, args.outputPath, args);
+      return await writeDocument(args.content, undefined, args);
     case 'convert_document':
       // 传递 targetFormat 参数
       const convertOptions = { ...args, targetFormat: args.targetFormat };
-      return await convertDocument(args.inputPath, args.outputPath, convertOptions);
+      return await convertDocument(args.inputPath, undefined, convertOptions);
     case 'create_word_document':
-      return await createWordDocument(args.content, args.outputPath, args);
+      return await createWordDocument(args.content, undefined, args);
     default:
       throw new Error(`Unknown basic document operation: ${name}`);
   }
@@ -3347,7 +3340,7 @@ async function handlePdfOperations(name: string, args: any) {
     case 'process_pdf_post_conversion':
       return await processPdfPostConversion(args.playwrightPdfPath, args.targetPath, args);
     case 'convert_docx_to_pdf':
-      return await convertDocxToPdf(args.docxPath, args.outputPath, args);
+      return await convertDocxToPdf(args.docxPath, undefined, args);
     default:
       throw new Error(`Unknown PDF operation: ${name}`);
   }
@@ -3369,7 +3362,7 @@ async function handleMarkdownOperations(name: string, args: any) {
 
 // 处理Markdown到HTML转换
 async function handleMarkdownToHtml(args: any) {
-  const outputPath = resolveOutputPath(args.outputPath, args.markdownPath, '.html');
+  const outputPath = resolveOutputPath(undefined, args.markdownPath, '.html');
   
   return await convertMarkdownToHtml(args.markdownPath, {
     theme: args.theme ?? 'github',
@@ -3383,7 +3376,7 @@ async function handleMarkdownToHtml(args: any) {
 
 // 处理Markdown到DOCX转换
 async function handleMarkdownToDocx(args: any) {
-  const outputPath = resolveOutputPath(args.outputPath, args.markdownPath, '.docx');
+  const outputPath = resolveOutputPath(undefined, args.markdownPath, '.docx');
   
   return await convertMarkdownToDocx(args.markdownPath, {
     theme: args.theme ?? 'professional',
@@ -3396,7 +3389,7 @@ async function handleMarkdownToDocx(args: any) {
 
 // 处理Markdown到PDF转换
 async function handleMarkdownToPdf(args: any) {
-  const outputPath = resolveOutputPath(args.outputPath, args.markdownPath, '.pdf');
+  const outputPath = resolveOutputPath(undefined, args.markdownPath, '.pdf');
   
   return await convertMarkdownToPdf(args.markdownPath, outputPath, {
     theme: args.theme ?? 'github',
@@ -3421,7 +3414,7 @@ async function handleHtmlToMarkdown(args: any) {
   const { EnhancedHtmlToMarkdownConverter } = await import('./tools/enhancedHtmlToMarkdownConverter.js');
   const enhancedConverter = new EnhancedHtmlToMarkdownConverter();
   
-  const finalOutputPath = resolveOutputPath(args.outputPath, args.htmlPath, '.md');
+  const finalOutputPath = resolveOutputPath(undefined, args.htmlPath, '.md');
   
   return await enhancedConverter.convertHtmlToMarkdown(args.htmlPath, {
     preserveStyles: args.preserveStyles !== false,
