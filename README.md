@@ -52,32 +52,8 @@ bun add -g doc-ops-mcp
       }
     }
   }
-}```
-
-### Environment Variables
-
-The server supports environment variables for controlling output paths and PDF enhancement features:
-
-#### Core Directories
-- **`OUTPUT_DIR`**: Controls where all generated files are saved (default: `~/Documents`)
-- **`CACHE_DIR`**: Directory for temporary and cache files (default: `~/.cache/doc-ops-mcp`)
-
-#### PDF Enhancement Features
-- **`WATERMARK_IMAGE`**: Default watermark image path for PDF files
-  - Automatically added to all PDF conversions
-  - Supported formats: PNG, JPG
-  - If not set, default text watermark "doc-ops-mcp" will be used
-- **`QR_CODE_IMAGE`**: Default QR code image path for PDF files
-  - Added to PDFs only when explicitly requested (`addQrCode=true`)
-  - Supported formats: PNG, JPG
-  - If not set, QR code functionality will be unavailable
-
-**Output Path Rules:**
-1. If `outputPath` is not provided → files saved to `OUTPUT_DIR` with auto-generated names
-2. If `outputPath` is relative → resolved relative to `OUTPUT_DIR`
-3. If `outputPath` is absolute → used as-is, ignoring `OUTPUT_DIR`
-
-See [OUTPUT_PATH_CONTROL.md](./OUTPUT_PATH_CONTROL.md) for detailed documentation.
+}
+```
 
 ### Supported Document Operations
 
@@ -117,6 +93,31 @@ Add watermark to /Users/docs/document.pdf
 Add QR code to /Users/docs/report.pdf
 Add company logo watermark to /Users/docs/invoice.pdf
 ```
+
+### Environment Variables
+
+The server supports environment variables for controlling output paths and PDF enhancement features:
+
+#### Core Directories
+- **`OUTPUT_DIR`**: Controls where all generated files are saved (default: `~/Documents`)
+- **`CACHE_DIR`**: Directory for temporary and cache files (default: `~/.cache/doc-ops-mcp`)
+
+#### PDF Enhancement Features
+- **`WATERMARK_IMAGE`**: Default watermark image path for PDF files
+  - Automatically added to all PDF conversions
+  - Supported formats: PNG, JPG
+  - If not set, default text watermark "doc-ops-mcp" will be used
+- **`QR_CODE_IMAGE`**: Default QR code image path for PDF files
+  - Added to PDFs only when explicitly requested (`addQrCode=true`)
+  - Supported formats: PNG, JPG
+  - If not set, QR code functionality will be unavailable
+
+**Output Path Rules:**
+1. If `outputPath` is not provided → files saved to `OUTPUT_DIR` with auto-generated names
+2. If `outputPath` is relative → resolved relative to `OUTPUT_DIR`
+3. If `outputPath` is absolute → used as-is, ignoring `OUTPUT_DIR`
+
+See [OUTPUT_PATH_CONTROL.md](./OUTPUT_PATH_CONTROL.md) for detailed documentation.
 
 ## 2. System Architecture
 
@@ -195,8 +196,6 @@ This server uses intelligent conversion architecture:
 4. **Enhancement Processing**: Automatically add watermarks, QR codes and other enhancements
 5. **Optional Integration**: Support working with `playwright-mcp` for enhanced capabilities
 
-
-
 ## 4. Features
 
 ### MCP Tools
@@ -207,8 +206,8 @@ This server uses intelligent conversion architecture:
 |-----------|-------------|------------------|----------------------|
 | `read_document` | Read document content | `filePath`: Document path<br>`extractMetadata`: Extract metadata<br>`preserveFormatting`: Preserve formatting | None |
 | `write_document` | Write document content | `content`: Document content<br>`outputPath`: Output file path<br>`encoding`: File encoding | None |
-| `convert_document` | Smart document conversion | `inputPath`: Input file path<br>`outputPath`: Output file path<br>`preserveFormatting`: Preserve formatting<br>`useInternalPlaywright`: Use built-in Playwright | Depends on conversion type |
-| `rewrite_document` | Smart document rewriting | `inputPath`: Document path<br>`rewriteRules`: Rewrite rules list<br>`outputPath`: Output path<br>`preserveOriginalFormat`: Keep original format | None |
+| `convert_document` | Smart document conversion | `inputPath`: Input file path<br>`outputPath`: Output file path<br>`preserveFormatting`: Preserve formatting | None |
+| `plan_conversion` | Conversion planner | `sourceFormat`: Source format<br>`targetFormat`: Target format<br>`preserveStyles`: Preserve styles<br>`quality`: Conversion quality | None |
 
 ##### **read_document**
 Read various document formats including PDF, DOCX, DOC, HTML, MD, and more.
@@ -245,8 +244,6 @@ Convert DOCX to PDF with automatic watermark addition (if configured).
 - `preserveFormatting` (boolean, optional) - Preserve original formatting, defaults to `true`
 - `chineseFont` (string, optional) - Chinese font, defaults to `Microsoft YaHei`
 
-**External Dependency:** Requires `playwright-mcp` for PDF conversion
-
 ##### **convert_markdown_to_pdf**
 Convert Markdown to PDF with automatic watermark addition (if configured).
 
@@ -256,8 +253,6 @@ Convert Markdown to PDF with automatic watermark addition (if configured).
 - `theme` (string, optional) - Theme style, defaults to `"github"`
 - `includeTableOfContents` (boolean, optional) - Include table of contents, defaults to `false`
 - `addQrCode` (boolean, optional) - Whether to add QR code, defaults to `false`
-
-**External Dependency:** Requires `playwright-mcp` for PDF conversion
 
 ##### **convert_markdown_to_html**
 Convert Markdown to HTML.
@@ -294,95 +289,15 @@ Convert HTML to Markdown.
 - `theme` (string, optional) - Conversion theme, defaults to `github`
 - `quality` (string, optional) - Conversion quality requirement (fast, balanced, high), defaults to `balanced`
 
-##### **rewrite_document**
-📝 Smart Document Rewriting Tool - Perform content rewriting, text replacement, and format adjustment on existing documents.
-
-**Key Features:**
-- Support intelligent rewriting for multiple document formats
-- Text content replacement (supports regular expressions)
-- Format-preserving rewriting and style adjustment
-- Document structure reorganization and content optimization
-- Batch rewrite rule application
-
-**Supported Rewrite Formats:**
-- **Direct Rewriting**: MD, HTML (direct text operations)
-- **Conversion Rewriting**: DOCX → HTML → Rewrite → DOCX
-- **Smart Rewriting**: Automatically identify format and select optimal rewrite strategy
-
-**Parameters:**
-- `inputPath` (string, required) - Path to the document to be rewritten
-- `outputPath` (string, optional) - Output file path (overwrites original file if not specified)
-- `rewriteRules` (array, required) - List of rewrite rules:
-  - `type` (string) - Rewrite type: `"replace"` | `"format"` | `"structure"`
-  - `oldText` (string) - Original text to be replaced
-  - `newText` (string) - New text after replacement
-  - `useRegex` (boolean, optional) - Whether to use regular expressions, defaults to `false`
-  - `preserveCase` (boolean, optional) - Whether to preserve case, defaults to `false`
-  - `preserveFormatting` (boolean, optional) - Whether to preserve original formatting, defaults to `true`
-- `preserveOriginalFormat` (boolean, optional) - Whether to maintain original document format, defaults to `true`
-- `backupOriginal` (boolean, optional) - Whether to backup original file, defaults to `false`
-
-**Rewrite Rule Types:**
-- **replace**: Text content replacement
-  - Supports plain text and regular expression replacement
-  - Configurable case sensitivity
-- **format**: Format markup adjustment
-  - Modify Markdown markup, HTML tags, etc.
-  - Adjust document styles and layout
-- **structure**: Structure reorganization
-  - Reorganize paragraphs and sections
-  - Adjust heading levels and content order
-
-**Usage Example:**
-```json
-{
-  "inputPath": "/path/to/document.md",
-  "outputPath": "/path/to/rewritten_document.md",
-  "rewriteRules": [
-    {
-      "type": "replace",
-      "oldText": "Old Company Name",
-      "newText": "New Company Name",
-      "preserveCase": true
-    },
-    {
-      "type": "format",
-      "oldText": "## (.*)",
-      "newText": "### $1",
-      "useRegex": true
-    }
-  ],
-  "preserveOriginalFormat": true,
-  "backupOriginal": true
-}
-```
-
-**Important Notes:**
-- Rewrite operations are executed in the order of the rules list
-- When using regular expressions, ensure expression safety
-- Recommend enabling backup for important document rewrites
-- For complex format documents (like DOCX), the system will automatically select the optimal conversion path
-
 ##### **process_pdf_post_conversion**
-🔧 PDF post-processing unified tool - ⚠️ **Important**: This is a necessary follow-up step for playwright-mcp's browser_pdf_save command! When using playwright-mcp to generate PDF, you must immediately call this tool to complete final processing. Features include: 1) Automatically move PDF from playwright temporary path to target location 2) Unified watermark and QR code addition 3) Clean up temporary files. Workflow: playwright-mcp:browser_pdf_save → doc-ops-mcp:process_pdf_post_conversion
 
 **Parameters:**
-- `playwrightPdfPath` (string, required) - PDF file path generated by playwright-mcp (usually in temporary directory)
-- `targetPath` (string, optional) - Target PDF file path (auto-generated if not provided). If not absolute path, will be resolved relative to OUTPUT_DIR environment variable
-- `addWatermark` (boolean, optional) - Whether to add watermark (automatically added if WATERMARK_IMAGE environment variable is set), defaults to `false`
-- `addQrCode` (boolean, optional) - Whether to add QR code (automatically added if QR_CODE_IMAGE environment variable is set), defaults to `false`
-- `watermarkImage` (string, optional) - Watermark image path (overrides environment variable)
-- `watermarkText` (string, optional) - Watermark text content (defaults to "doc-ops-mcp" if no watermark image is provided)
-- `watermarkImageScale` (number, optional) - Watermark image scale ratio, defaults to `0.25`
-- `watermarkImageOpacity` (number, optional) - Watermark image opacity, defaults to `0.3`
-- `watermarkImagePosition` (string, optional) - Watermark image position, options: `["top-left", "top-right", "bottom-left", "bottom-right", "center"]`, defaults to `"top-right"`
-- `qrCodePath` (string, optional) - QR code image path (overrides environment variable)
-- `qrScale` (number, optional) - QR code scale ratio, defaults to `0.15`
-- `qrOpacity` (number, optional) - QR code opacity, defaults to `1.0`
-- `qrPosition` (string, optional) - QR code position, options: `["top-left", "top-right", "top-center", "bottom-left", "bottom-right", "bottom-center", "center"]`, defaults to `"bottom-center"`
-- `customText` (string, optional) - Custom text below QR code, defaults to `"Scan QR code for more information"`
-
-**External Dependency:** Works with `playwright-mcp` generated PDF files
+- `playwrightPdfPath` (string, required) - Generated PDF file path
+- `targetPath` (string, optional) - Target PDF file path (auto-generated if not provided)
+- `addWatermark` (boolean, optional) - Whether to add watermark, defaults to `false`
+- `addQrCode` (boolean, optional) - Whether to add QR code, defaults to `false`
+- `watermarkImage` (string, optional) - Watermark image path
+- `qrCodePath` (string, optional) - QR code image path
 
 #### PDF Enhancement Tools
 
@@ -408,63 +323,6 @@ Convert HTML to Markdown.
 - `qrPosition` (string, optional) - QR code position, defaults to `bottom-center`
 - `addText` (boolean, optional) - Whether to add explanatory text, defaults to `true`
 
-#### Web Scraping Tools
-
-**⚠️ Legal and Ethical Use Notice**: Web scraping tools should be used in compliance with target websites' Terms of Service and applicable laws and regulations. Users are responsible for:
-
-- Respecting robots.txt files and website scraping policies
-- Complying with data protection and privacy laws (GDPR, CCPA, etc.)
-- Avoiding excessive requests that may impact website performance
-- Obtaining necessary permissions for commercial use of scraped data
-- Respecting intellectual property rights and copyright laws
-
-This tool is provided for legitimate research, development, and automation purposes. Misuse of these tools may result in legal consequences.
-
-##### **take_screenshot**
-🖼️ Web screenshot tool - Capture webpage or HTML content screenshot using Playwright Chromium.
-
-**Parameters:**
-- `urlOrHtml` (string, required) - Webpage URL or HTML content
-- `outputPath` (string, required) - Screenshot output path
-- `options` (object, optional) - Screenshot options:
-  - `width` (number) - Screenshot width
-  - `height` (number) - Screenshot height
-  - `format` (string) - Image format, options: `["png", "jpeg"]`
-  - `quality` (number) - JPEG quality (1-100)
-  - `fullPage` (boolean) - Whether to capture the full page
-
-##### **document_preview_screenshot**
-📋 Document preview screenshot - Convert DOCX and similar documents to preview screenshot.
-
-**Parameters:**
-- `documentPath` (string, required) - Document file path
-- `outputPath` (string, required) - Screenshot output path
-- `options` (object, optional) - Screenshot options:
-  - `width` (number) - Screenshot width
-  - `height` (number) - Screenshot height
-  - `fullPage` (boolean) - Whether to capture the full page
-
-##### **scrape_web_content**
-🕷️ Web content scraping - Use Playwright Chromium to scrape webpage content.
-
-**Parameters:**
-- `url` (string, required) - Webpage URL to scrape
-- `options` (object, optional) - Scraping options:
-  - `waitForSelector` (string) - CSS selector to wait for
-  - `timeout` (number) - Timeout in milliseconds
-  - `textOnly` (boolean) - Extract only plain text
-
-##### **scrape_structured_data**
-📊 Structured data scraping - Scrape structured data from webpages using a CSS selector.
-
-**Parameters:**
-- `url` (string, required) - Webpage URL to scrape
-- `selector` (string, required) - CSS selector
-- `options` (object, optional) - Scraping options:
-  - `timeout` (number) - Timeout in milliseconds
-
-
-
 ## 5. Performance Metrics
 
 ### Document Processing Capabilities
@@ -478,7 +336,7 @@ This tool is provided for legitimate research, development, and automation purpo
 
 ### Conversion Performance
 
-- **PDF Conversion**: Depends on playwright-mcp, ~1-3 pages/second
+- **PDF Conversion**: Requires playwright-mcp integration, ~1-3 pages/second
 - **DOCX Conversion**: Pure JavaScript processing, ~5-15 pages/second
 - **HTML Conversion**: Fastest, ~20-50 pages/second
 - **Concurrent Processing**: Supports up to 5 concurrent tasks
@@ -490,50 +348,7 @@ This tool is provided for legitimate research, development, and automation purpo
 - **CPU**: Single core sufficient, multi-core improves concurrency
 - **Disk Space**: Temporary files require 2-3x original file size
 
-## 6. Open Source Licenses
-
-### Project License
-- **This Project**: MIT License
-- **Compatibility**: Available for commercial and non-commercial use
-
-### Third-Party Dependencies
-
-| Library | Version | License | Purpose |
-|---------|---------|---------|----------|
-| **pdf-lib** | ^1.17.1 | MIT | PDF document manipulation |
-| **mammoth** | ^1.6.0 | BSD-2-Clause | DOCX parsing and conversion |
-| **marked** | ^9.1.6 | MIT | Markdown parsing and rendering |
-| **playwright** | ^1.40.0 | Apache-2.0 | Browser automation (optional) |
-| **exceljs** | ^4.4.0 | MIT | Excel file processing |
-| **jsdom** | ^23.0.1 | MIT | HTML DOM manipulation |
-| **turndown** | ^7.1.2 | MIT | HTML to Markdown conversion |
-
-### License Compatibility
-- ✅ **Commercial Use**: All dependencies support commercial use
-- ✅ **Distribution**: Free to distribute and modify
-- ✅ **Patent Protection**: Apache-2.0 provides patent protection
-- ⚠️ **Notice**: Original license notices must be retained
-
-## 7. Future Roadmap
-
-### Core Features
-- 🔄 **Enhanced Conversion Quality**: Improve style preservation for complex documents
-- 📊 **Excel Support**: Complete Excel read/write and conversion functionality
-- 🎨 **Template System**: Support for custom document templates
-- 🔍 **OCR Integration**: Image text recognition capabilities
-
-### System Improvements
-- 🌐 **Multi-language Support**: Internationalization and localization
-- 🔐 **Security Enhancements**: Document encryption and access control
-- ⚡ **Performance Optimization**: Large file handling and memory optimization
-- 🔌 **Plugin System**: Extensible processor architecture
-
-### Version Roadmap
-- **v2.0**: Complete Excel support and template system
-- **v3.0**: Enhanced security and performance optimization
-- **v4.0**: Plugin system and multi-language support
-
-## Requirements
+## System Requirements
 
 ### System Requirements
 - **Node.js** ≥ 18.0.0
@@ -568,9 +383,51 @@ bun add -g doc-ops-mcp
 - **Style Processor**: Ensures style preservation during format conversion
 - **Security Module**: Provides path validation and content security handling
 
+## 6. Open Source Licenses
+
+### Project License
+- **This Project**: MIT License
+- **Compatibility**: Available for commercial and non-commercial use
+
+### Third-Party Dependencies
+
+| Library | Version | License | Purpose |
+|---------|---------|---------|----------|
+| **pdf-lib** | ^1.17.1 | MIT | PDF document manipulation |
+| **mammoth** | ^1.6.0 | BSD-2-Clause | DOCX parsing and conversion |
+| **marked** | ^9.1.6 | MIT | Markdown parsing and rendering |
+| **exceljs** | ^4.4.0 | MIT | Excel file processing |
+| **jsdom** | ^23.0.1 | MIT | HTML DOM manipulation |
+| **turndown** | ^7.1.2 | MIT | HTML to Markdown conversion |
+
+### License Compatibility
+- ✅ **Commercial Use**: All dependencies support commercial use
+- ✅ **Distribution**: Free to distribute and modify
+- ✅ **Patent Protection**: Apache-2.0 provides patent protection
+- ⚠️ **Notice**: Original license notices must be retained
+
+## 7. Future Roadmap
+
+### Core Features
+- 🔄 **Enhanced Conversion Quality**: Improve style preservation for complex documents
+- 📊 **Excel Support**: Complete Excel read/write and conversion functionality
+- 🎨 **Template System**: Support for custom document templates
+- 🔍 **OCR Integration**: Image text recognition capabilities
+
+### System Improvements
+- 🌐 **Multi-language Support**: Internationalization and localization
+- 🔐 **Security Enhancements**: Document encryption and access control
+- ⚡ **Performance Optimization**: Large file handling and memory optimization
+- 🔌 **Plugin System**: Extensible processor architecture
+
+### Version Roadmap
+- **v2.0**: Complete Excel support and template system
+- **v3.0**: OCR integration and multi-language support
+- **v4.0**: Advanced security features and plugin system
+
 ## 8. Docker Deployment
 
-### Quick Start with Docker
+### Quick Start
 
 #### Using Pre-built Image
 
@@ -640,7 +497,7 @@ services:
 ### Environment Variables
 
 | Variable | Description | Default |
-|----------|-------------|---------|
+|----------|-------------|----------|
 | `PORT` | Server port | `3000` |
 | `NODE_ENV` | Environment mode | `production` |
 | `LOG_LEVEL` | Logging level | `info` |
@@ -686,28 +543,6 @@ docker inspect --format='{{.State.Health.Status}}' doc-ops-mcp
 
 # Manual health check
 docker exec doc-ops-mcp curl -f http://localhost:3000/health || exit 1
-```
-
-### Troubleshooting
-
-#### Common Issues
-
-1. **Port conflicts**: Change the host port in docker-compose.yml
-2. **Permission issues**: Ensure volume mounts have correct permissions
-3. **Memory issues**: Increase Docker memory allocation
-
-#### Debug Mode
-
-```bash
-# Run with debug logging
-docker run -d \
-  --name doc-ops-mcp \
-  -p 3000:3000 \
-  -e LOG_LEVEL=debug \
-  doc-ops-mcp
-
-# View logs
-docker logs -f doc-ops-mcp
 ```
 
 ## 9. Development Guide
@@ -757,17 +592,9 @@ src/
 
 ### Common Issues
 
-#### Memory Issues
-- **Problem**: Out of memory errors with large files
-- **Solution**: Increase Node.js memory limit: `node --max-old-space-size=4096`
-
-#### PDF Conversion Fails
-- **Problem**: PDF conversion not working
-- **Solution**: Ensure `playwright-mcp` is properly configured
-
-#### Permission Errors
-- **Problem**: Cannot write to output directory
-- **Solution**: Check file permissions and `OUTPUT_DIR` configuration
+1. **Port conflicts**: Change the host port in docker-compose.yml
+2. **Permission issues**: Ensure volume mounts have correct permissions
+3. **Memory issues**: Increase Docker memory allocation
 
 ### Debug Mode
 
