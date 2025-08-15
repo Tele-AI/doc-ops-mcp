@@ -9,15 +9,18 @@ const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
 const { StdioServerTransport } = require('@modelcontextprotocol/sdk/server/stdio.js');
 const {
   CallToolRequestSchema,
-  ErrorCode,
   ListToolsRequestSchema,
-  McpError,
 } = require('@modelcontextprotocol/sdk/types.js');
 const fs = require('fs/promises');
 const WordExtractor = require('word-extractor');
 import * as path from 'path';
 const cheerio = require('cheerio');
-const { createSecureTempPath, escapeHtml, sanitizeCssProperty, defaultSecurityConfig, validateAndSanitizePath, safePathJoin } = require('./security/securityConfig.js');
+const { 
+  createSecureTempPath,
+  escapeHtml,
+  sanitizeCssProperty,
+  defaultSecurityConfig,
+} = require('./security/securityConfig.js');
 
 // 路径安全验证函数 - 移除路径限制，允许访问任意目录
 function validatePath(inputPath: string, allowedBasePaths: string[] = []): string {
@@ -521,11 +524,28 @@ async function writeDocument(
 }
 
 // Helper functions for convertDocument
-function resolveConvertOutputPath(inputPath: string, outputPath?: string): { finalOutputPath: string, inputExt: string, outputExt: string } {
+function resolveConvertOutputPath(inputPath: string, outputPath?: string, targetFormat?: string): { finalOutputPath: string, inputExt: string, outputExt: string } {
   const validatedInputPath = validatePath(inputPath);
   const inputExt = path.extname(validatedInputPath).toLowerCase();
   
-  const outputExt = outputPath ? path.extname(validatePath(outputPath)).toLowerCase() : '.html';
+  // 优先使用 outputPath 的扩展名，其次使用 targetFormat，最后默认为 .html
+  let outputExt: string;
+  if (outputPath) {
+    outputExt = path.extname(validatePath(outputPath)).toLowerCase();
+  } else if (targetFormat) {
+    // 根据 targetFormat 确定扩展名
+    const formatToExt: Record<string, string> = {
+      'pdf': '.pdf',
+      'html': '.html',
+      'docx': '.docx',
+      'markdown': '.md',
+      'md': '.md',
+      'txt': '.txt'
+    };
+    outputExt = formatToExt[targetFormat.toLowerCase()] || '.html';
+  } else {
+    outputExt = '.html';
+  }
 
   let finalOutputPath: string;
   if (!outputPath) {
@@ -701,6 +721,45 @@ async function convertDocxToHtmlSpecial(inputPath: string, finalOutputPath: stri
   }
 }
 
+async function convertHtmlToPdfSpecial(inputPath: string, finalOutputPath: string, options: ConvertDocumentOptions) {
+  console.error('🔄 检测到 HTML 转 PDF 转换...');
+  console.error(`📄 输入: ${inputPath}`);
+  console.error(`📁 输出: ${finalOutputPath}`);
+
+  try {
+    const result = await convertHtmlToPdf(inputPath, {
+      outputPath: finalOutputPath,
+      preserveStyles: options.preserveFormatting !== false,
+      debug: true,
+    });
+
+    console.error('📊 HTML 转 PDF 结果:', {
+      success: result.success,
+      outputPath: result.outputPath,
+      error: result.error,
+    });
+
+    if (result.success) {
+      return {
+        success: true,
+        outputPath: result.outputPath || finalOutputPath,
+        metadata: {
+          ...result.metadata,
+          converter: 'html-to-pdf',
+        },
+      };
+    } else {
+      throw new Error(result.error ?? 'HTML 转 PDF 失败');
+    }
+  } catch (conversionError: any) {
+    console.error('❌ HTML 转 PDF 转换失败:', conversionError.message);
+    return {
+      success: false,
+      error: `HTML 转 PDF 失败: ${conversionError.message}`,
+    };
+  }
+}
+
 function applyRegexReplacement(content: string, replacement: any): string {
   if (replacement.oldText.length > 100) {
     console.warn('正则表达式过长，跳过处理');
@@ -766,10 +825,10 @@ async function performGenericConversion(inputPath: string, finalOutputPath: stri
 async function convertDocument(
   inputPath: string,
   outputPath?: string,
-  options: ConvertDocumentOptions = {}
+  options: ConvertDocumentOptions & { targetFormat?: string } = {}
 ) {
   try {
-    const { finalOutputPath, inputExt, outputExt } = resolveConvertOutputPath(inputPath, outputPath);
+    const { finalOutputPath, inputExt, outputExt } = resolveConvertOutputPath(inputPath, outputPath, options.targetFormat);
 
     // Handle special conversion cases
     if (inputExt === '.html' && outputExt === '.md') {
@@ -786,6 +845,11 @@ async function convertDocument(
 
     if (inputExt === '.docx' && outputExt === '.html') {
       return await convertDocxToHtmlSpecial(inputPath, finalOutputPath);
+    }
+
+    // Handle HTML to PDF conversion - 需要特殊处理
+    if (inputExt === '.html' && outputExt === '.pdf') {
+      return await convertHtmlToPdfSpecial(inputPath, finalOutputPath, options);
     }
 
     // Handle generic conversions
@@ -2617,7 +2681,7 @@ async function convertMarkdownToTxt(inputPath: string, outputPath?: string, opti
 const server = new Server(
   {
     name: 'doc-ops-mcp',
-    version: '0.0.9',
+    version: '0.1.0',
   },
   {
     capabilities: {
@@ -3116,7 +3180,9 @@ async function handleBasicDocumentOperations(name: string, args: any) {
     case 'write_document':
       return await writeDocument(args.content, args.outputPath, args);
     case 'convert_document':
-      return await convertDocument(args.inputPath, args.outputPath, args);
+      // 传递 targetFormat 参数
+      const convertOptions = { ...args, targetFormat: args.targetFormat };
+      return await convertDocument(args.inputPath, args.outputPath, convertOptions);
     default:
       throw new Error(`Unknown basic document operation: ${name}`);
   }
