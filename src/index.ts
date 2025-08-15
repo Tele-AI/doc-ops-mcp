@@ -19,9 +19,11 @@ import * as path from 'path';
 const cheerio = require('cheerio');
 const { createSecureTempPath, escapeHtml, sanitizeCssProperty, defaultSecurityConfig, validateAndSanitizePath, safePathJoin } = require('./security/securityConfig.js');
 
-// 路径安全验证函数 - 使用更安全的实现
+// 路径安全验证函数 - 移除路径限制，允许访问任意目录
 function validatePath(inputPath: string, allowedBasePaths: string[] = []): string {
-  return validateAndSanitizePath(inputPath, allowedBasePaths);
+  // 简单的路径解析，不进行安全限制
+  const path = require('path');
+  return path.resolve(inputPath);
 }
 
 
@@ -82,20 +84,17 @@ export {
 
 // 辅助函数：准备转换路径
 async function prepareHtmlToDocxPaths(inputPath: string, outputPath?: string) {
-  const allowedInputPaths = [process.cwd(), defaultResourcePaths.tempDir];
-  const allowedOutputPaths = [defaultResourcePaths.outputDir, process.cwd()];
-  
-  const validatedInputPath = validatePath(inputPath, allowedInputPaths);
+  const validatedInputPath = validatePath(inputPath);
   let finalOutputPath = outputPath;
   
   if (!finalOutputPath) {
     const baseName = path.basename(validatedInputPath, path.extname(validatedInputPath));
-    finalOutputPath = safePathJoin(defaultResourcePaths.outputDir, `${baseName}.docx`);
+    finalOutputPath = path.join(defaultResourcePaths.outputDir, `${baseName}.docx`);
   } else if (!path.isAbsolute(finalOutputPath)) {
-    finalOutputPath = safePathJoin(defaultResourcePaths.outputDir, finalOutputPath);
+    finalOutputPath = path.join(defaultResourcePaths.outputDir, finalOutputPath);
   }
   
-  const validatedOutputPath = validatePath(finalOutputPath ?? '', allowedOutputPaths);
+  const validatedOutputPath = validatePath(finalOutputPath ?? '');
   await fs.mkdir(path.dirname(validatedOutputPath), { recursive: true });
   
   return { validatedInputPath, validatedOutputPath };
@@ -491,9 +490,8 @@ function resolveFinalOutputPath(outputPath?: string): string {
 }
 
 async function writeFileWithEncoding(finalPath: string, content: string, encoding: string) {
-  // 验证路径安全性
-  const allowedPaths = [defaultResourcePaths.outputDir, defaultResourcePaths.tempDir, process.cwd()];
-  const validatedPath = validatePath(finalPath, allowedPaths);
+  // 简单的路径解析，不进行安全限制
+  const validatedPath = validatePath(finalPath);
   
   await fs.mkdir(path.dirname(validatedPath), { recursive: true });
   await fs.writeFile(validatedPath, content, encoding);
@@ -526,18 +524,17 @@ async function writeDocument(
 function resolveConvertOutputPath(inputPath: string, outputPath?: string): { finalOutputPath: string, inputExt: string, outputExt: string } {
   const validatedInputPath = validatePath(inputPath);
   const inputExt = path.extname(validatedInputPath).toLowerCase();
-  const allowedOutputPaths = [defaultResourcePaths.outputDir, process.cwd()];
   
-  const outputExt = outputPath ? path.extname(validatePath(outputPath, allowedOutputPaths)).toLowerCase() : '.html';
+  const outputExt = outputPath ? path.extname(validatePath(outputPath)).toLowerCase() : '.html';
 
   let finalOutputPath: string;
   if (!outputPath) {
     const baseName = path.basename(validatedInputPath, inputExt);
-    finalOutputPath = safePathJoin(defaultResourcePaths.outputDir, `${baseName}${outputExt}`);
+    finalOutputPath = path.join(defaultResourcePaths.outputDir, `${baseName}${outputExt}`);
   } else if (!path.isAbsolute(outputPath)) {
-    finalOutputPath = safePathJoin(defaultResourcePaths.outputDir, outputPath);
+    finalOutputPath = path.join(defaultResourcePaths.outputDir, outputPath);
   } else {
-    finalOutputPath = validatePath(outputPath, allowedOutputPaths);
+    finalOutputPath = validatePath(outputPath);
   }
 
   return { finalOutputPath, inputExt, outputExt };
@@ -800,15 +797,13 @@ async function convertDocument(
 
 // Helper functions for convertDocxToPdf
 function resolvePdfOutputPath(inputPath: string, outputPath?: string): string {
-  const allowedPaths = [defaultResourcePaths.outputDir, process.cwd()];
-  
   if (!outputPath) {
     const baseName = path.basename(inputPath, path.extname(inputPath));
-    return safePathJoin(defaultResourcePaths.outputDir, `${baseName}.pdf`);
+    return path.join(defaultResourcePaths.outputDir, `${baseName}.pdf`);
   } else if (!path.isAbsolute(outputPath)) {
-    return safePathJoin(defaultResourcePaths.outputDir, outputPath);
+    return path.join(defaultResourcePaths.outputDir, outputPath);
   }
-  return validatePath(outputPath, allowedPaths);
+  return validatePath(outputPath);
 }
 
 function checkWatermarkAndQRConfig(options: any): { hasWatermark: boolean, hasQRCode: boolean } {
@@ -1067,15 +1062,13 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
 
 // Helper functions for fallbackConvertDocxToPdf
 function resolveFallbackOutputPath(inputPath: string, outputPath?: string): string {
-  const allowedPaths = [defaultResourcePaths.outputDir, process.cwd()];
-  
   if (!outputPath) {
     const baseName = path.basename(inputPath, path.extname(inputPath));
-    return safePathJoin(defaultResourcePaths.outputDir, `${baseName}.pdf`);
+    return path.join(defaultResourcePaths.outputDir, `${baseName}.pdf`);
   } else if (!path.isAbsolute(outputPath)) {
-    return safePathJoin(defaultResourcePaths.outputDir, outputPath);
+    return path.join(defaultResourcePaths.outputDir, outputPath);
   }
-  return validatePath(outputPath, allowedPaths);
+  return validatePath(outputPath);
 }
 
 function logFallbackConversionStart(docxPath: string, finalOutputPath: string) {
@@ -2203,7 +2196,6 @@ async function addQRCode(pdfPath: string, qrCodePath?: string, options: QRCodeOp
 // Helper functions for processPdfPostConversion
 function resolvePostProcessingPath(playwrightPdfPath: string, targetPath?: string): string {
   const outputDir = process.env.OUTPUT_DIR ?? path.dirname(playwrightPdfPath);
-  const allowedPaths = [outputDir, defaultResourcePaths.outputDir, process.cwd()];
   
   if (!targetPath) {
     // Extract original filename from playwright path
@@ -2215,14 +2207,14 @@ function resolvePostProcessingPath(playwrightPdfPath: string, targetPath?: strin
     
     // Sanitize the decoded name to prevent path traversal attacks
     const sanitizedName = path.basename(decodedName).replace(/[^a-zA-Z0-9._-]/g, '_');
-    return safePathJoin(outputDir, sanitizedName);
+    return path.join(outputDir, sanitizedName);
   } else if (!path.isAbsolute(targetPath)) {
-    // Use safe path joining for relative paths
-    return safePathJoin(outputDir, path.basename(targetPath));
+    // Use path joining for relative paths
+    return path.join(outputDir, path.basename(targetPath));
   }
 
-  // For absolute paths, use our validation function
-  return validatePath(targetPath, allowedPaths);
+  // For absolute paths, use simple validation
+  return validatePath(targetPath);
 }
 
 async function processWatermarkAddition(finalPath: string, options: any): Promise<any> {

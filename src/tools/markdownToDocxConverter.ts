@@ -184,9 +184,9 @@ class MarkdownToDocxConverter {
       // 保存文件（如果指定了输出路径）
       let docxPath: string | undefined;
       if (this.options.outputPath) {
-        const { validateAndSanitizePath } = require('../security/securityConfig');
-        const allowedPaths = [process.cwd()];
-        const validatedPath = validateAndSanitizePath(this.options.outputPath, allowedPaths);
+ // 简单的路径解析，不进行安全限制
+      const path = require('path');
+      const validatedPath = path.resolve(this.options.outputPath);
         if (validatedPath) {
           docxPath = validatedPath;
           await fs.writeFile(validatedPath, docxBuffer);

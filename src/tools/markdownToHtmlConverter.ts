@@ -577,9 +577,9 @@ class MarkdownToHtmlConverter {
       // 保存文件（如果指定了输出路径）
       let htmlPath: string | undefined;
       if (this.options.outputPath) {
-        const { validateAndSanitizePath } = require('../security/securityConfig');
-        const allowedPaths = [process.cwd()];
-        htmlPath = validateAndSanitizePath(this.options.outputPath, allowedPaths);
+        // 简单的路径解析，不进行安全限制
+      const path = require('path');
+      htmlPath = path.resolve(this.options.outputPath);
         await fs.writeFile(htmlPath, completeHtml, 'utf-8');
 
         if (this.options.debug) {
