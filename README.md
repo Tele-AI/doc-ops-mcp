@@ -46,12 +46,13 @@ bun add -g doc-ops-mcp
       "args": ["-y", "doc-ops-mcp@latest"],
       "env": {
         "OUTPUT_DIR": "/path/to/your/output/directory",
-        "CACHE_DIR": "/path/to/your/cache/directory"
+        "CACHE_DIR": "/path/to/your/cache/directory",
+        "WATERMARK_IMAGE": "/path/to/your/watermark.png",
+        "QR_CODE_IMAGE": "/path/to/your/qrcode.png"
       }
     }
   }
-}
-```
+}```
 
 ### Environment Variables
 
@@ -78,10 +79,48 @@ The server supports environment variables for controlling output paths and PDF e
 
 See [OUTPUT_PATH_CONTROL.md](./OUTPUT_PATH_CONTROL.md) for detailed documentation.
 
+### Supported Document Operations
+
+| Format | Convert to PDF | Convert to DOCX | Convert to HTML | Convert to Markdown | Content Rewriting | Watermark/QR Code |
+|--------|----------------|-----------------|-----------------|---------------------|-------------------|-------------------|
+| **PDF** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **DOCX** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **HTML** | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ |
+| **Markdown** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+
+**Rewriting Features:**
+- **Content Replacement**: Support batch text replacement and regular expression replacement
+- **Format Adjustment**: Modify document structure, heading levels, and style formatting
+- **Smart Rewriting**: Content optimization while preserving original document format
+
+### Usage Examples
+
+**Format Conversion:**
+```
+Convert /Users/docs/report.docx to PDF
+Convert /Users/docs/article.md to HTML
+Convert /Users/docs/presentation.html to DOCX
+Convert /Users/docs/readme.md to PDF (with theme styling)
+```
+
+**Document Rewriting:**
+```
+Rewrite company names in /Users/docs/contract.md
+Batch replace terminology in /Users/docs/manual.docx
+Adjust heading levels in /Users/docs/article.html
+Update dates and version numbers in /Users/docs/policy.md
+```
+
+**PDF Enhancement:**
+```
+Add watermark to /Users/docs/document.pdf
+Add QR code to /Users/docs/report.pdf
+Add company logo watermark to /Users/docs/invoice.pdf
+```
 
 ## 2. System Architecture
 
-Document Operations MCP Server adopts a hybrid architecture design, combining internal processing with external dependencies:
+Document Operations MCP Server adopts a pure JavaScript architecture design, providing complete document processing capabilities:
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
@@ -104,8 +143,8 @@ Document Operations MCP Server adopts a hybrid architecture design, combining in
 │  │  └─────────────┘  └─────────────┘  └─────────────┘   │ │
 │  │                                                        │ │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │ │
-│  │  │    PDF      │  │  Watermark/ │  │    Web      │   │ │
-│  │  │ Enhancement │  │   QR Code   │  │  Scraper    │   │ │
+│  │  │    PDF      │  │  Watermark/ │  │ Conversion  │   │ │
+│  │  │ Enhancement │  │   QR Code   │  │  Planner    │   │ │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘   │ │
 └────┴───────────────────────────────────────────────────────┴─┘
                             │
@@ -115,32 +154,25 @@ Document Operations MCP Server adopts a hybrid architecture design, combining in
 │  │   pdf-lib   │  │   mammoth   │  │   marked    │          │
 │  │ (PDF Tools) │  │(DOCX Tools) │  │ (Markdown)  │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
-└─────────────────────────────────────────────────────────────┘
-                            │
-┌───────────────────────────┴─────────────────────────────────┐
-│                External Dependencies (PDF Conversion)       │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                playwright-mcp                       │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐ │   │
-│  │  │  Browser    │  │    HTML     │  │    PDF      │ │   │
-│  │  │ Automation  │  │  Rendering  │  │ Generation  │ │   │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘ │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
+│  │   cheerio   │  │   turndown  │  │    docx     │          │
+│  │(HTML Parser)│  │(HTML to MD) │  │(DOCX Gen.)  │          │
+│  └─────────────┘  └─────────────┘  └─────────────┘          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Architecture Overview
 
-**Internal Processing Layer**:
-- Document reading, format conversion, style processing
-- PDF watermark and QR code addition
-- Web content scraping
+**Core Features**:
+- Pure JavaScript implementation with no external system dependencies
+- Complete document reading, conversion, and style processing capabilities
+- Built-in PDF watermark and QR code addition functionality
+- Intelligent conversion planning and path optimization
 
-**External Dependencies Layer**:
-- **PDF Conversion**: Relies on `playwright-mcp` for HTML → PDF conversion
-- **Conversion Flow**: DOCX/Markdown → HTML → PDF (via playwright-mcp)
-
-**Important Note**: All PDF conversion features require `playwright-mcp` to work properly.
+**Conversion Flow**:
+- **Direct Conversion**: Supports direct conversion between most formats
+- **Multi-step Conversion**: Complex conversions achieved through intermediate formats
+- **Style Preservation**: Uses OOXML parser to ensure complete style integrity
 
 ## 3. Optional Integration
 
@@ -210,6 +242,8 @@ Convert DOCX to PDF with automatic watermark addition (if configured).
 - `docxPath` (string, required) - DOCX file path
 - `outputPath` (string, optional) - Output PDF path (auto-generated if not provided)
 - `addQrCode` (boolean, optional) - Whether to add QR code, defaults to `false`
+- `preserveFormatting` (boolean, optional) - Preserve original formatting, defaults to `true`
+- `chineseFont` (string, optional) - Chinese font, defaults to `Microsoft YaHei`
 
 **External Dependency:** Requires `playwright-mcp` for PDF conversion
 
@@ -249,11 +283,16 @@ Convert HTML to Markdown.
 - `outputPath` (string, optional) - Output Markdown path (auto-generated if not provided)
 
 ##### **plan_conversion**
-Generate conversion plan by analyzing input file and providing conversion suggestions.
+🎯 Smart Conversion Planner - Analyze conversion requirements and generate optimal conversion plans.
 
 **Parameters:**
-- `inputPath` (string, required) - Input file path
-- `outputPath` (string, optional) - Output file path
+- `sourceFormat` (string, required) - Source file format (pdf, docx, html, markdown, md, txt, doc)
+- `targetFormat` (string, required) - Target file format (pdf, docx, html, markdown, md, txt, doc)
+- `sourceFile` (string, optional) - Source file path (for generating specific conversion parameters)
+- `preserveStyles` (boolean, optional) - Whether to preserve style formatting, defaults to `true`
+- `includeImages` (boolean, optional) - Whether to include images, defaults to `true`
+- `theme` (string, optional) - Conversion theme, defaults to `github`
+- `quality` (string, optional) - Conversion quality requirement (fast, balanced, high), defaults to `balanced`
 
 ##### **rewrite_document**
 📝 Smart Document Rewriting Tool - Perform content rewriting, text replacement, and format adjustment on existing documents.
@@ -345,6 +384,30 @@ Generate conversion plan by analyzing input file and providing conversion sugges
 
 **External Dependency:** Works with `playwright-mcp` generated PDF files
 
+#### PDF Enhancement Tools
+
+##### **add_watermark**
+🎨 PDF Watermark Addition Tool - Add image or text watermarks to PDF documents.
+
+**Parameters:**
+- `pdfPath` (string, required) - PDF file path
+- `watermarkImage` (string, optional) - Watermark image path (PNG/JPG)
+- `watermarkText` (string, optional) - Watermark text content
+- `watermarkImageScale` (number, optional) - Image scale ratio, defaults to `0.25`
+- `watermarkImageOpacity` (number, optional) - Image opacity, defaults to `0.6`
+- `watermarkImagePosition` (string, optional) - Image position, defaults to `fullscreen`
+
+##### **add_qrcode**
+📱 PDF QR Code Addition Tool - Add QR codes to PDF documents.
+
+**Parameters:**
+- `pdfPath` (string, required) - PDF file path
+- `qrCodePath` (string, optional) - QR code image path
+- `qrScale` (number, optional) - QR code scale ratio, defaults to `0.15`
+- `qrOpacity` (number, optional) - QR code opacity, defaults to `1.0`
+- `qrPosition` (string, optional) - QR code position, defaults to `bottom-center`
+- `addText` (boolean, optional) - Whether to add explanatory text, defaults to `true`
+
 #### Web Scraping Tools
 
 **⚠️ Legal and Ethical Use Notice**: Web scraping tools should be used in compliance with target websites' Terms of Service and applicable laws and regulations. Users are responsible for:
@@ -400,44 +463,7 @@ This tool is provided for legitimate research, development, and automation purpo
 - `options` (object, optional) - Scraping options:
   - `timeout` (number) - Timeout in milliseconds
 
-### Supported Document Operations
 
-| Format | Convert to PDF | Convert to DOCX | Convert to HTML | Convert to Markdown | Content Rewriting | Watermark/QR Code |
-|--------|----------------|-----------------|-----------------|---------------------|-------------------|-------------------|
-| **PDF** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
-| **DOCX** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-| **HTML** | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ |
-| **Markdown** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
-
-**Rewriting Features:**
-- **Content Replacement**: Support batch text replacement and regular expression replacement
-- **Format Adjustment**: Modify document structure, heading levels, and style formatting
-- **Smart Rewriting**: Content optimization while preserving original document format
-
-## Usage Examples
-
-**Format Conversion:**
-```
-Convert /Users/docs/report.docx to PDF
-Convert /Users/docs/article.md to HTML
-Convert /Users/docs/presentation.html to DOCX
-Convert /Users/docs/readme.md to PDF (with theme styling)
-```
-
-**Document Rewriting:**
-```
-Rewrite company names in /Users/docs/contract.md
-Batch replace terminology in /Users/docs/manual.docx
-Adjust heading levels in /Users/docs/article.html
-Update dates and version numbers in /Users/docs/policy.md
-```
-
-**PDF Enhancement:**
-```
-Add watermark to /Users/docs/document.pdf
-Add QR code to /Users/docs/report.pdf
-Add company logo watermark to /Users/docs/invoice.pdf
-```
 
 ## 5. Performance Metrics
 
@@ -509,32 +535,38 @@ Add company logo watermark to /Users/docs/invoice.pdf
 
 ## Requirements
 
-### Dependencies
+### System Requirements
 - **Node.js** ≥ 18.0.0
-- **Zero external tools** - All processing via npm packages
-- **Optional**: playwright-mcp for external browser automation
+- **Zero external system dependencies** - All processing via npm packages
+- **Optional Integration**: playwright-mcp for enhanced PDF conversion
 
-### Pure JavaScript Stack
-- **pdf-lib** - PDF manipulation
-- **mammoth** - DOCX processing  
-- **playwright** - Web automation
-- **marked** - Markdown processing
-- **exceljs** - Spreadsheet handling
-- **puppeteer** - PDF generation from HTML
+### Core Technology Stack
+- **pdf-lib** - PDF operations and enhancement
+- **mammoth** - DOCX document processing  
+- **marked** - Markdown parsing and rendering
+- **cheerio** - HTML parsing and manipulation
+- **turndown** - HTML to Markdown conversion
+- **docx** - DOCX document generation
 
 ### Installation
 ```bash
-# Only Node.js required
+# Global installation
 npm install -g doc-ops-mcp
+
+# Or using pnpm
+pnpm add -g doc-ops-mcp
+
+# Or using bun
+bun add -g doc-ops-mcp
 ```
 
-### Component Overview
+### Architecture Components
 
 - **MCP Server Core**: Handles JSON-RPC 2.0 communication and tool registration
-- **Tool Router**: Routes requests to appropriate processing modules
-- **Processing Engine**: Contains specialized processors for different document types
-- **Data Processing Layer**: Pure JavaScript libraries for document manipulation
-- **Zero External Dependencies**: All processing done via npm packages
+- **Smart Router**: Routes requests to optimal processing modules
+- **Conversion Engine**: Contains specialized converters for different document types
+- **Style Processor**: Ensures style preservation during format conversion
+- **Security Module**: Provides path validation and content security handling
 
 ## 8. Docker Deployment
 
