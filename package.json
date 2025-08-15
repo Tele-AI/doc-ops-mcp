@@ -54,7 +54,7 @@
     "pdfreader": "^3.0.6",
     "pizzip": "^3.1.4",
     "playwright": "^1.53.1",
-    "puppeteer": "^21.11.0",
+    "puppeteer": "^24.16.2",
     "safer-buffer": "^2.1.2",
     "turndown": "^7.2.0",
     "unzipper": "^0.12.3",
