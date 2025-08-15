@@ -107,7 +107,7 @@ test_*.ts
 
 # Package manager lock files (keep only one)
 # Uncomment the one you don't use
-# package-lock.json
+package-lock.json
 # yarn.lock
 # pnpm-lock.yaml
 
