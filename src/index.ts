@@ -2617,7 +2617,7 @@ async function convertMarkdownToTxt(inputPath: string, outputPath?: string, opti
 const server = new Server(
   {
     name: 'doc-ops-mcp',
-    version: '0.0.8',
+    version: '0.0.9',
   },
   {
     capabilities: {
