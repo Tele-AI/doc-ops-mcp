@@ -190,12 +190,13 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
 
       const markdownContent = result.content ?? '';
 
-      // 简单的路径解析，不进行安全限制
+      // 导入安全配置函数
+      const { validateAndSanitizePath } = require('../security/securityConfig');
+      const allowedPaths = [path.dirname(inputPath), process.cwd()];
       
       // 生成输出路径
-      const rawOutputPath =
-        options.outputPath || this.options.outputPath || inputPath.replace(/\.html?$/i, '.docx');
-      const outputPath = path.resolve(rawOutputPath);
+      const rawOutputPath = this.options.outputPath || inputPath.replace(/\.html?$/i, '.md');
+      const outputPath = validateAndSanitizePath(rawOutputPath, allowedPaths);
 
       // 保存文件
       await fs.writeFile(outputPath, markdownContent, 'utf-8');
@@ -255,11 +256,13 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
       // 提取纯文本内容
       const textContent = this.htmlToText($);
 
-      // 简单的路径解析，不进行安全限制
+      // 导入安全配置函数
+      const { validateAndSanitizePath } = require('../security/securityConfig');
+      const allowedPaths = [path.dirname(inputPath), process.cwd()];
       
       // 生成输出路径
-      const rawOutputPath = options.outputPath || this.options.outputPath || inputPath.replace(/\.html?$/i, '.txt');
-      const outputPath = path.resolve(rawOutputPath);
+      const rawOutputPath = this.options.outputPath || inputPath.replace(/\.html?$/i, '.txt');
+      const outputPath = validateAndSanitizePath(rawOutputPath, allowedPaths);
 
       // 保存文件
       await fs.writeFile(outputPath, textContent, 'utf-8');
@@ -319,11 +322,14 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
       const enhancedConverter = new EnhancedHtmlToDocxConverter();
       const docxBuffer = await enhancedConverter.convertHtmlToDocx(htmlContent);
 
-      // 简单的路径解析，不进行安全限制
+      // 导入安全配置函数
+      const { validateAndSanitizePath } = require('../security/securityConfig');
+      const allowedPaths = [path.dirname(inputPath), process.cwd()];
       
       // 生成输出路径
-      const rawOutputPath = options.outputPath || this.options.outputPath || inputPath.replace(/\.html?$/i, '.md');
-      const outputPath = path.resolve(rawOutputPath);
+      const rawOutputPath =
+        options.outputPath || this.options.outputPath || inputPath.replace(/\.html?$/i, '.docx');
+      const outputPath = validateAndSanitizePath(rawOutputPath, allowedPaths);
 
       // 保存文件
       await fs.writeFile(outputPath, docxBuffer);

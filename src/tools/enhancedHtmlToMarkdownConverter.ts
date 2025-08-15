@@ -97,11 +97,12 @@ class EnhancedHtmlToMarkdownConverter {
       }
 
       // 导入安全配置函数
-      // 简单的路径解析，不进行安全限制
+      const { validateAndSanitizePath } = require('../security/securityConfig');
+      const allowedPaths = [path.dirname(inputPath), process.cwd()];
       
       // 生成输出路径
       const rawOutputPath = this.options.outputPath || inputPath.replace(/\.html?$/i, '.md');
-      const outputPath = path.resolve(rawOutputPath);
+      const outputPath = validateAndSanitizePath(rawOutputPath, allowedPaths);
 
       // 保存文件
       await fs.writeFile(outputPath, markdownContent, 'utf-8');
