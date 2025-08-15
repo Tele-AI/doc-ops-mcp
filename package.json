@@ -42,7 +42,7 @@
     "html-docx-js": "^0.3.1",
     "html-pdf-node": "^1.0.8",
     "iconv-lite": "^0.6.3",
-    "image-size": "^1.1.1",
+    "image-size": "^2.0.2",
     "jsdom": "^25.0.1",
     "jszip": "^3.10.1",
     "linkedom": "^0.18.11",
