@@ -1,7 +1,7 @@
 {
   "name": "doc-ops-mcp",
   "author": "Tele-AI",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP Document Converter Server — A Model Context Protocol server for seamless document format conversion and processing",
   "main": "dist/index.cjs",
   "license": "MIT",
