@@ -1,6 +1,6 @@
 # Document Operations MCP Server
 
-[![npm version](https://badge.fury.io/js/doc-ops-mcp.svg)](https://badge.fury.io/js/doc-ops-mcp)
+[![npm version](https://img.shields.io/npm/v/doc-ops-mcp.svg)](https://www.npmjs.com/package/doc-ops-mcp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Downloads](https://img.shields.io/npm/dm/doc-ops-mcp.svg)](https://www.npmjs.com/package/doc-ops-mcp)
 
