@@ -578,8 +578,8 @@ class MarkdownToHtmlConverter {
       let htmlPath: string | undefined;
       if (this.options.outputPath) {
         const { validateAndSanitizePath } = require('../security/securityConfig');
-        const allowedPaths = [process.cwd()];
-        htmlPath = validateAndSanitizePath(this.options.outputPath, allowedPaths);
+        // 移除路径限制，允许访问任意目录（与index.ts中的validatePath函数保持一致）
+        htmlPath = validateAndSanitizePath(this.options.outputPath, []);
         await fs.writeFile(htmlPath, completeHtml, 'utf-8');
 
         if (this.options.debug) {

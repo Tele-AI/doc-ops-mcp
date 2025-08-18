@@ -441,13 +441,13 @@ export class MediaHandler {
 
       // 导入安全配置函数
       const { safePathJoin, validateAndSanitizePath } = require('../security/securityConfig');
-      const allowedPaths = [this.options.outputDirectory, process.cwd()];
+      // 移除路径限制，允许访问任意目录（与index.ts中的validatePath函数保持一致）
       
       for (const mediaFile of this.mediaFiles) {
         // 使用安全的路径处理，防止路径遍历攻击
         const sanitizedName = path.basename(mediaFile.name); // 只取文件名，防止路径遍历
         const outputPath = safePathJoin(this.options.outputDirectory, sanitizedName);
-        const validatedPath = validateAndSanitizePath(outputPath, allowedPaths);
+        const validatedPath = validateAndSanitizePath(outputPath, []);
         
         await fs.writeFile(validatedPath, mediaFile.data);
         console.log(`💾 保存媒体文件: ${validatedPath}`);
