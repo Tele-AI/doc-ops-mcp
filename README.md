@@ -10,7 +10,7 @@
 
 ## Table of Contents
 
-1. [Getting Started](#1-getting-started)
+1. [Quick Start](#1-quick-start)
 2. [System Architecture](#2-system-architecture)
 3. [Optional Integration](#3-optional-integration)
 4. [Features](#4-features)
@@ -76,7 +76,6 @@ The Document Operations MCP server supports configuration through environment va
   "mcpServers": {
     "doc-ops-mcp": {
       "command": "npx",
->>>>>>> main-test
       "args": ["-y", "doc-ops-mcp"],
       "env": {
         "OUTPUT_DIR": "/path/to/your/output/directory",
@@ -89,13 +88,54 @@ The Document Operations MCP server supports configuration through environment va
 }
 ```
 
-#### Environment Variables
+### Supported Document Operations
 
-**Core Directories:**
+| Format | Convert to PDF | Convert to DOCX | Convert to HTML | Convert to Markdown | Content Rewriting | Watermark/QR Code |
+|--------|----------------|-----------------|-----------------|---------------------|-------------------|-------------------|
+| **PDF** | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ |
+| **DOCX** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+| **HTML** | ✅ | ❌ | ✅ | ✅ | ✅ | ❌ |
+| **Markdown** | ✅ | ✅ | ✅ | ✅ | ✅ | ❌ |
+
+**Rewriting Features:**
+- **Content Replacement**: Support batch text replacement and regular expression replacement
+- **Format Adjustment**: Modify document structure, heading levels, and style formatting
+- **Smart Rewriting**: Content optimization while preserving original document format
+
+### Usage Examples
+
+**Format Conversion:**
+```
+Convert /Users/docs/report.docx to PDF
+Convert /Users/docs/article.md to HTML
+Convert /Users/docs/presentation.html to DOCX
+Convert /Users/docs/readme.md to PDF (with theme styling)
+```
+
+**Document Rewriting:**
+```
+Rewrite company names in /Users/docs/contract.md
+Batch replace terminology in /Users/docs/manual.docx
+Adjust heading levels in /Users/docs/article.html
+Update dates and version numbers in /Users/docs/policy.md
+```
+
+**PDF Enhancement:**
+```
+Add watermark to /Users/docs/document.pdf
+Add QR code to /Users/docs/report.pdf
+Add company logo watermark to /Users/docs/invoice.pdf
+```
+
+### Environment Variables
+
+The server supports environment variables for controlling output paths and PDF enhancement features:
+
+#### Core Directories
 - **`OUTPUT_DIR`**: Controls where all generated files are saved (default: `~/Documents`)
 - **`CACHE_DIR`**: Directory for temporary and cache files (default: `~/.cache/doc-ops-mcp`)
 
-**PDF Enhancement Features:**
+#### PDF Enhancement Features
 - **`WATERMARK_IMAGE`**: Default watermark image path for PDF files
   - Automatically added to all PDF conversions
   - Supported formats: PNG, JPG
@@ -150,7 +190,7 @@ Document Operations MCP Server adopts a pure JavaScript architecture design, pro
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
 │  │   cheerio   │  │   turndown  │  │    docx     │          │
-│  │ (HTML Parse)│  │ (HTML to MD)│  │ (DOCX Gen)  │          │
+│  │(HTML Parser)│  │(HTML to MD) │  │(DOCX Gen.)  │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -159,12 +199,12 @@ Document Operations MCP Server adopts a pure JavaScript architecture design, pro
 
 **Core Features**:
 - Pure JavaScript implementation with no external system dependencies
-- Complete document reading, format conversion, and style processing capabilities
+- Complete document reading, conversion, and style processing capabilities
 - Built-in PDF watermark and QR code addition functionality
 - Intelligent conversion planning and path optimization
 
 **Conversion Flow**:
-- **Direct Conversion**: Supports most format-to-format conversions directly
+- **Direct Conversion**: Supports direct conversion between most formats
 - **Multi-step Conversion**: Complex conversions achieved through intermediate formats
 - **Style Preservation**: Uses OOXML parser to ensure complete style integrity
 
