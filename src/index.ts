@@ -20,38 +20,12 @@ const {
   escapeHtml,
   sanitizeCssProperty,
   defaultSecurityConfig,
+  validateAndSanitizePath,
 } = require('./security/securityConfig');
 
-// 路径安全验证函数 - 确保路径在允许的目录内
+// 路径安全验证函数 - 移除路径限制
 function validatePath(inputPath: string, allowedBasePaths: string[] = []): string {
-  const path = require('path');
-  const resolvedPath = path.resolve(inputPath);
-  
-  // 获取当前的资源路径配置
-  const resourcePaths = getDefaultResourcePaths();
-  
-  // 默认允许的基础路径
-  const defaultAllowedPaths = [
-    resourcePaths.outputDir,
-    resourcePaths.cacheDir,
-    resourcePaths.tempDir,
-    process.cwd(), // 当前工作目录
-  ];
-  
-  const allAllowedPaths = [...defaultAllowedPaths, ...allowedBasePaths];
-  
-  // 检查路径是否在允许的目录内
-  const isAllowed = allAllowedPaths.some(allowedPath => {
-    if (!allowedPath) return false;
-    const resolvedAllowedPath = path.resolve(allowedPath);
-    return resolvedPath.startsWith(resolvedAllowedPath);
-  });
-  
-  if (!isAllowed) {
-    throw new Error(`Path is not within allowed directories: ${resolvedPath}. Allowed paths: ${allAllowedPaths.filter(p => p).join(', ')}`);
-  }
-  
-  return resolvedPath;
+  return validateAndSanitizePath(inputPath, []);
 }
 
 
@@ -110,7 +84,7 @@ export {
   ConversionPlanner,
 };
 
-// 辅助函数：准备转换路径
+// 辅助函数：准备转换路径（已移除路径限制）
 async function prepareHtmlToDocxPaths(inputPath: string, outputPath?: string) {
   const validatedInputPath = validatePath(inputPath);
   let finalOutputPath = outputPath;
@@ -548,7 +522,7 @@ function resolveFinalOutputPath(outputPath?: string, content?: string, format?: 
 }
 
 async function writeFileWithEncoding(finalPath: string, content: string, encoding: string) {
-  // 简单的路径解析，不进行安全限制
+  // 验证路径安全性（已移除路径限制）
   const validatedPath = validatePath(finalPath);
   
   await fs.mkdir(path.dirname(validatedPath), { recursive: true });
@@ -2352,7 +2326,7 @@ async function addQRCode(pdfPath: string, qrCodePath?: string, options: QRCodeOp
 
 // Helper functions for processPdfPostConversion
 function resolvePostProcessingPath(playwrightPdfPath: string, targetPath?: string): string {
-  const outputDir = defaultResourcePaths.outputDir;
+  const outputDir = process.env.OUTPUT_DIR ?? path.dirname(playwrightPdfPath);
   
   if (!targetPath) {
     // Extract original filename from playwright path
@@ -2370,7 +2344,7 @@ function resolvePostProcessingPath(playwrightPdfPath: string, targetPath?: strin
     return path.join(outputDir, path.basename(targetPath));
   }
 
-  // For absolute paths, use simple validation
+  // For absolute paths, use our validation function (已移除路径限制)
   return validatePath(targetPath);
 }
 

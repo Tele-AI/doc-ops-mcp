@@ -15,28 +15,62 @@
 3. [可选集成说明](#3-可选集成说明)
 4. [功能特性](#4-功能特性)
 5. [性能指标](#5-性能指标)
-6. [开源协议](#6-开源协议)
-7. [未来规划](#7-未来规划)
-8. [Docker部署](#8-docker部署)
-9. [开发指南](#9-开发指南)
-10. [故障排除](#10-故障排除)
-11. [贡献指南](#11-贡献指南)
+6. [系统要求](#6-系统要求)
+7. [开源协议](#7-开源协议)
+8. [未来规划](#8-未来规划)
+9. [Docker部署](#9-docker部署)
+10. [开发指南](#10-开发指南)
+11. [故障排除](#11-故障排除)
+12. [贡献指南](#12-贡献指南)
 
 ## 1. 快速开始
 
-### 安装
-```bash
-# 通过 npm
-npm install -g doc-ops-mcp
+首先，将 Document Operations MCP 服务器添加到您的 MCP 客户端。
 
-# 通过 pnpm
-pnpm add -g doc-ops-mcp
+**标准配置** 适用于大多数 MCP 客户端：
 
-# 通过 bun
-bun add -g doc-ops-mcp
+```json
+{
+  "mcpServers": {
+    "doc-ops-mcp": {
+      "command": "npx",
+      "args": ["-y", "doc-ops-mcp"]
+    }
+  }
+}
 ```
 
+<details>
+<summary>Claude Desktop</summary>
+
+按照 MCP 安装 [指南](https://modelcontextprotocol.io/quickstart/user)，使用上面的标准配置。
+
+</details>
+
+<details>
+<summary>VS Code</summary>
+
+按照 MCP 安装 [指南](https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server)，使用上面的标准配置。
+
+</details>
+
+<details>
+<summary>Cursor</summary>
+
+转到 `Cursor Settings` -> `MCP` -> `Add new MCP Server`。随意命名，使用 `command` 类型，命令为 `npx -y doc-ops-mcp`。
+
+</details>
+
+<details>
+<summary>其他 MCP 客户端</summary>
+
+对于其他 MCP 客户端，使用上面的标准配置，并参考您的客户端文档进行 MCP 服务器安装。
+
+</details>
+
 ### 配置
+
+Document Operations MCP 服务器支持通过环境变量进行配置。这些可以在 MCP 客户端配置中作为 `"env"` 对象的一部分提供：
 
 ```json
 {
@@ -47,13 +81,36 @@ bun add -g doc-ops-mcp
       "env": {
         "OUTPUT_DIR": "/path/to/your/output/directory",
         "CACHE_DIR": "/path/to/your/cache/directory",
-        "WATERMARK_IMAGE": "/path/to/your/watermark.png",
-        "QR_CODE_IMAGE": "/path/to/your/qrcode.png"
+        "WATERMARK_IMAGE": "/path/to/watermark.png",
+        "QR_CODE_IMAGE": "/path/to/qrcode.png"
       }
     }
   }
 }
 ```
+
+#### 环境变量
+
+**核心目录：**
+- **`OUTPUT_DIR`**: 控制所有生成文件的保存位置（默认：`~/Documents`）
+- **`CACHE_DIR`**: 临时文件和缓存文件的目录（默认：`~/.cache/doc-ops-mcp`）
+
+**PDF 增强功能：**
+- **`WATERMARK_IMAGE`**: PDF 文件的默认水印图片路径
+  - 自动添加到所有 PDF 转换中
+  - 支持格式：PNG、JPG
+  - 如果未设置，将使用默认文字水印"doc-ops-mcp"
+- **`QR_CODE_IMAGE`**: PDF 文件的默认二维码图片路径
+  - 仅在明确要求时添加到 PDF 中（`addQrCode=true`）
+  - 支持格式：PNG、JPG
+  - 如果未设置，二维码功能将不可用
+
+**输出路径规则：**
+1. 如果未提供 `outputPath` → 文件保存到 `OUTPUT_DIR`，使用自动生成的名称
+2. 如果 `outputPath` 是相对路径 → 相对于 `OUTPUT_DIR` 解析
+3. 如果 `outputPath` 是绝对路径 → 按原样使用，忽略 `OUTPUT_DIR`
+
+详细文档请参见 [OUTPUT_PATH_CONTROL.md](./OUTPUT_PATH_CONTROL.md)。
 
 ### 支持的文档操作
 
@@ -94,30 +151,7 @@ bun add -g doc-ops-mcp
 为 /Users/docs/invoice.pdf 添加公司logo水印
 ```
 
-### 环境变量
 
-服务器支持环境变量来控制输出路径和PDF增强功能：
-
-#### 核心目录
-- **`OUTPUT_DIR`**: 控制所有生成文件的保存位置（默认：`~/Documents`）
-- **`CACHE_DIR`**: 临时文件和缓存文件的目录（默认：`~/.cache/doc-ops-mcp`）
-
-#### PDF 增强功能
-- **`WATERMARK_IMAGE`**: PDF 文件的默认水印图片路径
-  - 自动添加到所有 PDF 转换中
-  - 支持格式：PNG、JPG
-  - 如果未设置，将使用默认文字水印"doc-ops-mcp"
-- **`QR_CODE_IMAGE`**: PDF 文件的默认二维码图片路径
-  - 仅在明确要求时添加到 PDF 中（`addQrCode=true`）
-  - 支持格式：PNG、JPG
-  - 如果未设置，二维码功能将不可用
-
-**输出路径规则：**
-1. 如果未提供 `outputPath` → 文件保存到 `OUTPUT_DIR`，使用自动生成的名称
-2. 如果 `outputPath` 是相对路径 → 相对于 `OUTPUT_DIR` 解析
-3. 如果 `outputPath` 是绝对路径 → 按原样使用，忽略 `OUTPUT_DIR`
-
-详细文档请参见 [OUTPUT_PATH_CONTROL.md](./OUTPUT_PATH_CONTROL.md)。
 
 ## 2. 系统架构
 
@@ -350,7 +384,7 @@ HTML转Markdown。
 - **CPU**：单核心即可，多核心可提升并发性能
 - **磁盘空间**：临时文件约占原文件大小的 2-3 倍
 
-## 系统要求
+## 6. 系统要求
 
 ### 系统要求
 - **Node.js** ≥ 18.0.0
@@ -385,7 +419,7 @@ bun add -g doc-ops-mcp
 - **样式处理器**: 确保格式转换中的样式保留
 - **安全模块**: 提供路径验证和内容安全处理
 
-## 6. 开源协议
+## 7. 开源协议
 
 ### 项目协议
 - **本项目**：MIT License
@@ -408,7 +442,7 @@ bun add -g doc-ops-mcp
 - ✅ **专利保护**：Apache-2.0 提供专利保护
 - ⚠️ **注意事项**：使用时需保留原始协议声明
 
-## 7. 未来规划
+## 8. 未来规划
 
 ### 核心功能
 - 🔄 **增强转换质量**：改进复杂文档的样式保留
@@ -427,7 +461,7 @@ bun add -g doc-ops-mcp
 - **v3.0**：OCR 集成和多语言支持
 - **v4.0**：高级安全功能和插件系统
 
-## 8. Docker部署
+## 9. Docker部署
 
 ### 快速开始
 
@@ -547,7 +581,7 @@ docker inspect --format='{{.State.Health.Status}}' doc-ops-mcp
 docker exec doc-ops-mcp curl -f http://localhost:3000/health || exit 1
 ```
 
-## 9. 开发指南
+## 10. 开发指南
 
 ### 本地开发
 
@@ -590,7 +624,7 @@ src/
 4. 添加测试用例
 5. 更新文档
 
-## 10. 故障排除
+## 11. 故障排除
 
 #### 常见问题
 
@@ -612,7 +646,7 @@ docker run -d \
 docker logs -f doc-ops-mcp
 ```
 
-## 11. 贡献指南
+## 12. 贡献指南
 
 ### 如何贡献
 
