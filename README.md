@@ -10,7 +10,7 @@
 
 ## Table of Contents
 
-1. [Quick Start](#1-quick-start)
+1. [Getting Started](#1-getting-started)
 2. [System Architecture](#2-system-architecture)
 3. [Optional Integration](#3-optional-integration)
 4. [Features](#4-features)
@@ -22,46 +22,79 @@
 10. [Troubleshooting](#10-troubleshooting)
 11. [Contributing](#11-contributing)
 
-## 1. Quick Start
+## 1. Getting Started
 
-### Installation
-```bash
-# Via npm
-npm install -g doc-ops-mcp
+First, add the Document Operations MCP server to your MCP client.
 
-# Via pnpm
-pnpm add -g doc-ops-mcp
-
-# Via bun
-bun add -g doc-ops-mcp
-```
-
-### Configuration
+**Standard config** works in most MCP clients:
 
 ```json
 {
   "mcpServers": {
     "doc-ops-mcp": {
       "command": "npx",
-      "args": ["-y", "doc-ops-mcp@latest"],
+      "args": ["-y", "doc-ops-mcp"]
+    }
+  }
+}
+```
+
+<details>
+<summary>Claude Desktop</summary>
+
+Follow the MCP install [guide](https://modelcontextprotocol.io/quickstart/user), use the standard config above.
+
+</details>
+
+<details>
+<summary>VS Code</summary>
+
+Follow the MCP install [guide](https://code.visualstudio.com/docs/copilot/chat/mcp-servers#_add-an-mcp-server), use the standard config above.
+
+</details>
+
+<details>
+<summary>Cursor</summary>
+
+Go to `Cursor Settings` -> `MCP` -> `Add new MCP Server`. Name to your liking, use `command` type with the command `npx -y doc-ops-mcp`.
+
+</details>
+
+<details>
+<summary>Other MCP Clients</summary>
+
+For other MCP clients, use the standard config above and refer to your client's documentation for MCP server installation.
+
+</details>
+
+### Configuration
+
+The Document Operations MCP server supports configuration through environment variables. These can be provided in the MCP client configuration as part of the `"env"` object:
+
+```json
+{
+  "mcpServers": {
+    "doc-ops-mcp": {
+      "command": "npx",
+      "args": ["-y", "doc-ops-mcp"],
       "env": {
         "OUTPUT_DIR": "/path/to/your/output/directory",
-        "CACHE_DIR": "/path/to/your/cache/directory"
+        "CACHE_DIR": "/path/to/your/cache/directory",
+        "WATERMARK_IMAGE": "/path/to/watermark.png",
+        "QR_CODE_IMAGE": "/path/to/qrcode.png"
       }
     }
   }
 }
 ```
 
-### Environment Variables
+#### Environment Variables
 
-The server supports environment variables for controlling output paths and PDF enhancement features:
-
-#### Core Directories
+**Core Directories:**
 - **`OUTPUT_DIR`**: Controls where all generated files are saved (default: `~/Documents`)
 - **`CACHE_DIR`**: Directory for temporary and cache files (default: `~/.cache/doc-ops-mcp`)
 
-#### PDF Enhancement Features
+**PDF Enhancement Features:**
 - **`WATERMARK_IMAGE`**: Default watermark image path for PDF files
   - Automatically added to all PDF conversions
   - Supported formats: PNG, JPG
@@ -104,8 +137,8 @@ Document Operations MCP Server adopts a hybrid architecture design, combining in
 │  │  └─────────────┘  └─────────────┘  └─────────────┘   │ │
 │  │                                                        │ │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐   │ │
-│  │  │    PDF      │  │  Watermark/ │  │    Web      │   │ │
-│  │  │ Enhancement │  │   QR Code   │  │  Scraper    │   │ │
+│  │  │    PDF      │  │  Watermark/ │  │ Conversion  │   │ │
+│  │  │ Enhancement │  │   QR Code   │  │  Planner    │   │ │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘   │ │
 └────┴───────────────────────────────────────────────────────┴─┘
                             │
@@ -115,32 +148,25 @@ Document Operations MCP Server adopts a hybrid architecture design, combining in
 │  │   pdf-lib   │  │   mammoth   │  │   marked    │          │
 │  │ (PDF Tools) │  │(DOCX Tools) │  │ (Markdown)  │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
-└─────────────────────────────────────────────────────────────┘
-                            │
-┌───────────────────────────┴─────────────────────────────────┐
-│                External Dependencies (PDF Conversion)       │
-│  ┌─────────────────────────────────────────────────────┐   │
-│  │                playwright-mcp                       │   │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐ │   │
-│  │  │  Browser    │  │    HTML     │  │    PDF      │ │   │
-│  │  │ Automation  │  │  Rendering  │  │ Generation  │ │   │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘ │   │
-│  └─────────────────────────────────────────────────────┘   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
+│  │   cheerio   │  │   turndown  │  │    docx     │          │
+│  │ (HTML Parse)│  │ (HTML to MD)│  │ (DOCX Gen)  │          │
+│  └─────────────┘  └─────────────┘  └─────────────┘          │
 └─────────────────────────────────────────────────────────────┘
 ```
 
 ### Architecture Overview
 
-**Internal Processing Layer**:
-- Document reading, format conversion, style processing
-- PDF watermark and QR code addition
-- Web content scraping
+**Core Features**:
+- Pure JavaScript implementation with no external system dependencies
+- Complete document reading, format conversion, and style processing capabilities
+- Built-in PDF watermark and QR code addition functionality
+- Intelligent conversion planning and path optimization
 
-**External Dependencies Layer**:
-- **PDF Conversion**: Relies on `playwright-mcp` for HTML → PDF conversion
-- **Conversion Flow**: DOCX/Markdown → HTML → PDF (via playwright-mcp)
-
-**Important Note**: All PDF conversion features require `playwright-mcp` to work properly.
+**Conversion Flow**:
+- **Direct Conversion**: Supports most format-to-format conversions directly
+- **Multi-step Conversion**: Complex conversions achieved through intermediate formats
+- **Style Preservation**: Uses OOXML parser to ensure complete style integrity
 
 ## 3. Optional Integration
 

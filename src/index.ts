@@ -19,9 +19,9 @@ import * as path from 'path';
 const cheerio = require('cheerio');
 const { createSecureTempPath, escapeHtml, sanitizeCssProperty, defaultSecurityConfig, validateAndSanitizePath, safePathJoin } = require('./security/securityConfig.js');
 
-// 路径安全验证函数 - 使用更安全的实现
+// 路径安全验证函数 - 移除路径限制
 function validatePath(inputPath: string, allowedBasePaths: string[] = []): string {
-  return validateAndSanitizePath(inputPath, allowedBasePaths);
+  return validateAndSanitizePath(inputPath, []);
 }
 
 
@@ -80,12 +80,9 @@ export {
   ConversionPlanner,
 };
 
-// 辅助函数：准备转换路径
+// 辅助函数：准备转换路径（已移除路径限制）
 async function prepareHtmlToDocxPaths(inputPath: string, outputPath?: string) {
-  const allowedInputPaths = [process.cwd(), defaultResourcePaths.tempDir];
-  const allowedOutputPaths = [defaultResourcePaths.outputDir, process.cwd()];
-  
-  const validatedInputPath = validatePath(inputPath, allowedInputPaths);
+  const validatedInputPath = validatePath(inputPath);
   let finalOutputPath = outputPath;
   
   if (!finalOutputPath) {
@@ -95,7 +92,7 @@ async function prepareHtmlToDocxPaths(inputPath: string, outputPath?: string) {
     finalOutputPath = safePathJoin(defaultResourcePaths.outputDir, finalOutputPath);
   }
   
-  const validatedOutputPath = validatePath(finalOutputPath ?? '', allowedOutputPaths);
+  const validatedOutputPath = validatePath(finalOutputPath ?? '');
   await fs.mkdir(path.dirname(validatedOutputPath), { recursive: true });
   
   return { validatedInputPath, validatedOutputPath };
@@ -491,9 +488,8 @@ function resolveFinalOutputPath(outputPath?: string): string {
 }
 
 async function writeFileWithEncoding(finalPath: string, content: string, encoding: string) {
-  // 验证路径安全性
-  const allowedPaths = [defaultResourcePaths.outputDir, defaultResourcePaths.tempDir, process.cwd()];
-  const validatedPath = validatePath(finalPath, allowedPaths);
+  // 验证路径安全性（已移除路径限制）
+  const validatedPath = validatePath(finalPath);
   
   await fs.mkdir(path.dirname(validatedPath), { recursive: true });
   await fs.writeFile(validatedPath, content, encoding);
@@ -800,15 +796,13 @@ async function convertDocument(
 
 // Helper functions for convertDocxToPdf
 function resolvePdfOutputPath(inputPath: string, outputPath?: string): string {
-  const allowedPaths = [defaultResourcePaths.outputDir, process.cwd()];
-  
   if (!outputPath) {
     const baseName = path.basename(inputPath, path.extname(inputPath));
     return safePathJoin(defaultResourcePaths.outputDir, `${baseName}.pdf`);
   } else if (!path.isAbsolute(outputPath)) {
     return safePathJoin(defaultResourcePaths.outputDir, outputPath);
   }
-  return validatePath(outputPath, allowedPaths);
+  return validatePath(outputPath);
 }
 
 function checkWatermarkAndQRConfig(options: any): { hasWatermark: boolean, hasQRCode: boolean } {
@@ -1067,15 +1061,13 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
 
 // Helper functions for fallbackConvertDocxToPdf
 function resolveFallbackOutputPath(inputPath: string, outputPath?: string): string {
-  const allowedPaths = [defaultResourcePaths.outputDir, process.cwd()];
-  
   if (!outputPath) {
     const baseName = path.basename(inputPath, path.extname(inputPath));
     return safePathJoin(defaultResourcePaths.outputDir, `${baseName}.pdf`);
   } else if (!path.isAbsolute(outputPath)) {
     return safePathJoin(defaultResourcePaths.outputDir, outputPath);
   }
-  return validatePath(outputPath, allowedPaths);
+  return validatePath(outputPath);
 }
 
 function logFallbackConversionStart(docxPath: string, finalOutputPath: string) {
@@ -2203,7 +2195,6 @@ async function addQRCode(pdfPath: string, qrCodePath?: string, options: QRCodeOp
 // Helper functions for processPdfPostConversion
 function resolvePostProcessingPath(playwrightPdfPath: string, targetPath?: string): string {
   const outputDir = process.env.OUTPUT_DIR ?? path.dirname(playwrightPdfPath);
-  const allowedPaths = [outputDir, defaultResourcePaths.outputDir, process.cwd()];
   
   if (!targetPath) {
     // Extract original filename from playwright path
@@ -2221,8 +2212,8 @@ function resolvePostProcessingPath(playwrightPdfPath: string, targetPath?: strin
     return safePathJoin(outputDir, path.basename(targetPath));
   }
 
-  // For absolute paths, use our validation function
-  return validatePath(targetPath, allowedPaths);
+  // For absolute paths, use our validation function (已移除路径限制)
+  return validatePath(targetPath);
 }
 
 async function processWatermarkAddition(finalPath: string, options: any): Promise<any> {
