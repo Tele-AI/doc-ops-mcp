@@ -22,6 +22,18 @@
 10. [故障排除](#10-故障排除)
 11. [贡献指南](#11-贡献指南)
 
+## 演示
+
+### 视频
+
+<https://github.com/user-attachments/assets/demo.mov>
+
+在这个演示中，我们展示了如何：
+
+- 在 MCP 客户端中配置 doc-ops-mcp
+- 将 Markdown 文档转换为 HTML 格式
+- 将转换后的 HTML 转换为 PDF 文档
+
 ## 1. 快速开始
 
 首先，将 Document Operations MCP 服务器添加到您的 MCP 客户端。
@@ -185,13 +197,17 @@ Document Operations MCP Server 采用纯 JavaScript 架构设计，提供完整�
 ┌───────────────────────────┴─────────────────────────────────┐
 │                    核心依赖层                               │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │   pdf-lib   │  │   mammoth   │  │   marked    │          │
-│  │   (PDF处理) │  │  (DOCX处理) │  │ (Markdown)  │          │
+│  │   pdf-lib   │  │word-extractor│  │   marked    │          │
+│  │   (PDF处理) │  │  (DOCX读取) │  │ (Markdown)  │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │   cheerio   │  │   turndown  │  │   docx      │          │
-│  │ (HTML解析)  │  │ (HTML转MD)  │  │ (DOCX生成)  │          │
+│  │   cheerio   │  │    jszip    │  │    docx     │          │
+│  │ (HTML解析)  │  │  (ZIP处理)  │  │ (DOCX生成)  │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
+│  ┌─────────────┐  ┌─────────────┐                           │
+│  │   xml2js    │  │ 自定义OOXML │                           │
+│  │ (XML解析)   │  │   解析器    │                           │
+│  └─────────────┘  └─────────────┘                           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -392,11 +408,13 @@ HTML转Markdown。
 
 ### 核心技术栈
 - **pdf-lib** - PDF操作和增强
-- **mammoth** - DOCX文档处理  
+- **word-extractor** - DOCX文档文本提取
 - **marked** - Markdown解析和渲染
 - **cheerio** - HTML解析和操作
-- **turndown** - HTML到Markdown转换
 - **docx** - DOCX文档生成
+- **jszip** - ZIP文件处理
+- **xml2js** - XML解析和转换
+- **自定义OOXML解析器** - 高级DOCX样式保留
 
 ### 安装
 ```bash
@@ -429,11 +447,12 @@ bun add -g doc-ops-mcp
 | 依赖库 | 版本 | 协议 | 用途 |
 |--------|------|------|------|
 | **pdf-lib** | ^1.17.1 | MIT | PDF 文档操作和处理 |
-| **mammoth** | ^1.6.0 | BSD-2-Clause | DOCX 文档解析和转换 |
-| **marked** | ^9.1.6 | MIT | Markdown 解析和渲染 |
-| **exceljs** | ^4.4.0 | MIT | Excel 文件处理 |
-| **jsdom** | ^23.0.1 | MIT | HTML DOM 操作 |
-| **turndown** | ^7.1.2 | MIT | HTML 转 Markdown |
+| **word-extractor** | ^1.0.4 | MIT | DOCX 文档文本提取 |
+| **marked** | ^15.0.12 | MIT | Markdown 解析和渲染 |
+| **cheerio** | ^1.0.0-rc.12 | MIT | HTML 解析和操作 |
+| **docx** | ^9.5.1 | Apache-2.0 | DOCX 文档生成 |
+| **jszip** | ^3.10.1 | MIT | ZIP 文件处理 |
+| **xml2js** | ^0.6.2 | MIT | XML 解析和转换 |
 
 ### 协议兼容性
 - ✅ **商业使用**：所有依赖均支持商业使用

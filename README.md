@@ -8,6 +8,18 @@
 
 > **Document Operations MCP Server** - A universal MCP server for document processing, conversion, and automation. Handle PDF, DOCX, HTML, Markdown, and more through a unified API and toolset.
 
+## Demo
+
+### Video
+
+<https://github-production-user-asset-6210df.s3.amazonaws.com/83206877/478999982-463aba05-bf7e-4d18-a828-f9898c743787.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20250818%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250818T104249Z&X-Amz-Expires=300&X-Amz-Signature=cea37a894e1442764e7aa165c7c40e080e4935435c159327af7f882eadbad128&X-Amz-SignedHeaders=host>
+
+In this demo, we showcase how to:
+
+- Configure doc-ops-mcp in MCP clients
+- Convert Markdown documents to HTML format
+- Convert the resulting HTML to PDF documents
+
 ## Table of Contents
 
 1. [Quick Start](#1-quick-start)
@@ -22,7 +34,7 @@
 10. [Troubleshooting](#10-troubleshooting)
 11. [Contributing](#11-contributing)
 
-## 1. Getting Started
+## 1. Quick Start
 
 First, add the Document Operations MCP server to your MCP client.
 
@@ -185,13 +197,17 @@ Document Operations MCP Server adopts a pure JavaScript architecture design, pro
 ┌───────────────────────────┴─────────────────────────────────┐
 │                    Core Dependencies Layer                  │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │   pdf-lib   │  │   mammoth   │  │   marked    │          │
-│  │ (PDF Tools) │  │(DOCX Tools) │  │ (Markdown)  │          │
+│  │   pdf-lib   │  │word-extractor│  │   marked    │          │
+│  │ (PDF Tools) │  │(DOCX Reader)│  │ (Markdown)  │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
 │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │   cheerio   │  │   turndown  │  │    docx     │          │
-│  │(HTML Parser)│  │(HTML to MD) │  │(DOCX Gen.)  │          │
+│  │   cheerio   │  │    jszip    │  │    docx     │          │
+│  │(HTML Parser)│  │(ZIP Handler)│  │(DOCX Gen.)  │          │
 │  └─────────────┘  └─────────────┘  └─────────────┘          │
+│  ┌─────────────┐  ┌─────────────┐                           │
+│  │   xml2js    │  │Custom OOXML │                           │
+│  │(XML Parser) │  │   Parser    │                           │
+│  └─────────────┘  └─────────────┘                           │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -390,11 +406,13 @@ Convert HTML to Markdown.
 
 ### Core Technology Stack
 - **pdf-lib** - PDF operations and enhancement
-- **mammoth** - DOCX document processing  
+- **word-extractor** - DOCX document text extraction
 - **marked** - Markdown parsing and rendering
 - **cheerio** - HTML parsing and manipulation
-- **turndown** - HTML to Markdown conversion
 - **docx** - DOCX document generation
+- **jszip** - ZIP file processing
+- **xml2js** - XML parsing and conversion
+- **Custom OOXML Parser** - Advanced DOCX style preservation
 
 ### Installation
 ```bash
@@ -427,11 +445,12 @@ bun add -g doc-ops-mcp
 | Library | Version | License | Purpose |
 |---------|---------|---------|----------|
 | **pdf-lib** | ^1.17.1 | MIT | PDF document manipulation |
-| **mammoth** | ^1.6.0 | BSD-2-Clause | DOCX parsing and conversion |
-| **marked** | ^9.1.6 | MIT | Markdown parsing and rendering |
-| **exceljs** | ^4.4.0 | MIT | Excel file processing |
-| **jsdom** | ^23.0.1 | MIT | HTML DOM manipulation |
-| **turndown** | ^7.1.2 | MIT | HTML to Markdown conversion |
+| **word-extractor** | ^1.0.4 | MIT | DOCX document text extraction |
+| **marked** | ^15.0.12 | MIT | Markdown parsing and rendering |
+| **cheerio** | ^1.0.0-rc.12 | MIT | HTML parsing and manipulation |
+| **docx** | ^9.5.1 | Apache-2.0 | DOCX document generation |
+| **jszip** | ^3.10.1 | MIT | ZIP file processing |
+| **xml2js** | ^0.6.2 | MIT | XML parsing and conversion |
 
 ### License Compatibility
 - ✅ **Commercial Use**: All dependencies support commercial use
