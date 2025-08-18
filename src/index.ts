@@ -861,10 +861,6 @@ function checkWatermarkAndQRConfig(options: any): { hasWatermark: boolean, hasQR
   return { hasWatermark, hasQRCode };
 }
 
-function logConversionStart(inputPath: string, finalOutputPath: string) {
-  // Conversion logging removed for production
-}
-
 function createMcpCommands(result: any, hasWatermark: boolean, hasQRCode: boolean): string[] {
   const mcpCommands = [
     `browser_navigate("file://${result.htmlPath}")`,
@@ -995,8 +991,6 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
   const startTime = Date.now();
   const finalOutputPath = resolvePdfOutputPath(inputPath, outputPath);
   const { hasWatermark, hasQRCode } = checkWatermarkAndQRConfig(options);
-  
-  logConversionStart(inputPath, finalOutputPath);
 
   try {
     // 直接使用OOXML解析器进行转换
@@ -1086,9 +1080,7 @@ function resolveFallbackOutputPath(inputPath: string, outputPath?: string): stri
   return validatePath(outputPath);
 }
 
-function logFallbackConversionStart(docxPath: string, finalOutputPath: string) {
-  // Fallback conversion logging removed for production
-}
+
 
 async function tryCustomOOXMLForPdf(docxPath: string): Promise<{ success: boolean, content?: string }> {
   try {
@@ -1113,7 +1105,6 @@ async function fallbackConvertDocxToPdf(inputPath: string, outputPath?: string, 
   const docxPath = inputPath;
   const finalOutputPath = resolveFallbackOutputPath(inputPath, outputPath);
   
-  logFallbackConversionStart(docxPath, finalOutputPath);
   await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
 
   // 生成HTML内容
@@ -2303,10 +2294,6 @@ function resolveMarkdownPdfOutputPath(inputPath: string, outputPath?: string): s
   return outputPath;
 }
 
-function logMarkdownConversionStart(inputPath: string, outputPath: string): void {
-  // Markdown conversion logging removed for production
-}
-
 function createMarkdownPlaywrightCommands(htmlOutputPath: string, finalOutputPath: string): string[] {
   return [
     `browser_navigate("file://${htmlOutputPath}")`,
@@ -2336,7 +2323,6 @@ function createMarkdownPostProcessingSteps(options: any): string[] {
 async function convertMarkdownToPdf(inputPath: string, outputPath?: string, options: any = {}) {
   try {
     const finalOutputPath = resolveMarkdownPdfOutputPath(inputPath, outputPath);
-    logMarkdownConversionStart(inputPath, finalOutputPath);
 
     // 确保输出目录存在
     await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
@@ -2352,8 +2338,6 @@ async function convertMarkdownToPdf(inputPath: string, outputPath?: string, opti
     if (!htmlResult.success) {
       throw new Error(`Markdown 到 HTML 转换失败: ${htmlResult.error}`);
     }
-
-    // Markdown to HTML conversion completed
 
     // 获取水印和二维码配置
     const defaultWatermarkPath = process.env.WATERMARK_IMAGE ?? null;
@@ -2400,15 +2384,12 @@ function resolveDocxToMarkdownOutputPath(inputPath: string, outputPath?: string)
   return outputPath;
 }
 
-function logDocxToMarkdownConversionStart(inputPath: string, outputPath: string): void {
-  // DOCX to Markdown conversion logging removed for production
-}
+
 
 // DOCX 转 Markdown 函数
 async function convertDocxToMarkdown(inputPath: string, outputPath?: string, options: any = {}) {
   try {
     const finalOutputPath = resolveDocxToMarkdownOutputPath(inputPath, outputPath);
-    logDocxToMarkdownConversionStart(inputPath, finalOutputPath);
 
     // 确保输出目录存在
     await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
@@ -2462,15 +2443,10 @@ function resolveDocxToTxtOutputPath(inputPath: string, outputPath?: string): str
   return outputPath;
 }
 
-function logDocxToTxtConversionStart(inputPath: string, outputPath: string): void {
-  // DOCX to TXT conversion logging removed for production
-}
-
 // DOCX 转 TXT 函数
 async function convertDocxToTxt(inputPath: string, outputPath?: string, options: any = {}) {
   try {
     const finalOutputPath = resolveDocxToTxtOutputPath(inputPath, outputPath);
-    logDocxToTxtConversionStart(inputPath, finalOutputPath);
 
     // 确保输出目录存在
     await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
