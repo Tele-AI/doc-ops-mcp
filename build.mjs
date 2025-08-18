@@ -75,8 +75,6 @@ build({
     // 有问题的 jsdom 依赖
     'jsdom',
     './xhr-sync-worker.js',
-    // Puppeteer 相关依赖
-    'puppeteer',
     'escalade/sync',
     'esutils',
     'jsbn',
@@ -100,12 +98,10 @@ build({
     try {
       const { chmodSync } = await import('fs');
       chmodSync('dist/index.cjs', 0o755);
-      // 生产环境移除调试输出
     } catch (error) {
       // 生产环境移除调试输出
     }
   })
   .catch(error => {
-    // 生产环境移除调试输出
     process.exit(1);
   });

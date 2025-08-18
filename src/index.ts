@@ -256,17 +256,9 @@ async function processDocxWithFormatting(filePath: string, options: ReadDocument
 
 async function tryCustomOOXMLParser(filePath: string, options: ReadDocumentOptions) {
   try {
-    console.error('🚀 尝试自定义OOXML解析器...');
     const ooxmlResult = await convertDocxToHtmlWithOOXML(filePath, {
       preserveImages: options.saveImages !== false,
-      debug: true,
-    });
-
-    console.error('📊 自定义OOXML解析器结果:', {
-      success: ooxmlResult.success,
-      contentLength: ooxmlResult.content?.length ?? 0,
-      hasStyle: ooxmlResult.content?.includes('<style>') ?? false,
-      hasDoctype: ooxmlResult.content?.includes('<!DOCTYPE') ?? false,
+      debug: false,
     });
 
     if (ooxmlResult.success && ooxmlResult.content) {
@@ -275,14 +267,10 @@ async function tryCustomOOXMLParser(filePath: string, options: ReadDocumentOptio
       
       // 验证OOXML解析器的样式保留效果
       if (validateOOXMLStylesInContent(content)) {
-        console.error('✅ 自定义OOXML解析器样式验证通过');
         return createSuccessfulDocxResult(content, metadata, options);
-      } else {
-        console.error('⚠️ 自定义OOXML解析器样式验证失败');
       }
     }
   } catch (ooxmlError: any) {
-    console.error('❌ 自定义OOXML解析器失败:', ooxmlError.message);
     SafeErrorHandler.logError('Custom OOXML parser failed', ooxmlError);
   }
   
@@ -320,15 +308,6 @@ function validateOOXMLStylesInContent(content: string): boolean {
   
   // OOXML解析器应该生成完整的HTML文档结构
   const isValidOOXMLOutput = hasDoctype && hasStyleTag && hasBodyContent && hasValidCSS;
-  
-  console.error('🔍 OOXML样式验证:', {
-    hasDoctype,
-    hasStyleTag,
-    hasBodyContent,
-    hasValidCSS,
-    isValid: isValidOOXMLOutput,
-    contentLength: content.length
-  });
   
   return isValidOOXMLOutput;
 }
@@ -379,21 +358,12 @@ async function processDocFile(filePath: string) {
 }
 
 async function processMarkdownWithFormatting(filePath: string) {
-  console.error('🚀 使用增强型 Markdown 转换器进行样式保留转换...');
-
   try {
     const result = await convertMarkdownToHtml(filePath, {
       preserveStyles: true,
       theme: 'github', // 使用 GitHub 风格主题
       standalone: true,
-      debug: true,
-    });
-
-    console.error('📊 Markdown 转换结果:', {
-      success: result.success,
-      contentLength: result.content?.length ?? 0,
-      hasStyle: result.content?.includes('<style>') ?? false,
-      hasDoctype: result.content?.includes('<!DOCTYPE') ?? false,
+      debug: false,
     });
 
     return {
@@ -409,7 +379,6 @@ async function processMarkdownWithFormatting(filePath: string) {
       },
     };
   } catch (markdownError: any) {
-    console.error('❌ 增强型 Markdown 转换失败:', markdownError.message);
     throw markdownError;
   }
 }
@@ -599,22 +568,11 @@ function resolveConvertOutputPath(inputPath: string, outputPath?: string, target
 }
 
 async function convertHtmlToMarkdownSpecial(inputPath: string, finalOutputPath: string, options: ConvertDocumentOptions) {
-  console.error('🔄 检测到 HTML 转 Markdown 转换...');
-  console.error(`📄 输入: ${inputPath}`);
-  console.error(`📁 输出: ${finalOutputPath}`);
-
   try {
     const result = await convertHtmlToMarkdown(inputPath, {
       outputPath: finalOutputPath,
       preserveStyles: options.preserveFormatting !== false,
-      debug: true,
-    });
-
-    console.error('📊 HTML 转 Markdown 结果:', {
-      success: result.success,
-      outputPath: result.outputPath,
-      contentLength: result.content?.length ?? 0,
-      error: result.error,
+      debug: false,
     });
 
     if (result.success) {
@@ -631,7 +589,6 @@ async function convertHtmlToMarkdownSpecial(inputPath: string, finalOutputPath: 
       throw new Error(result.error ?? 'HTML 转 Markdown 失败');
     }
   } catch (conversionError: any) {
-    console.error('❌ HTML 转 Markdown 转换失败:', conversionError.message);
     return {
       success: false,
       error: `HTML 转 Markdown 失败: ${conversionError.message}`,
@@ -640,20 +597,10 @@ async function convertHtmlToMarkdownSpecial(inputPath: string, finalOutputPath: 
 }
 
 async function convertHtmlToDocxSpecial(inputPath: string, finalOutputPath: string, options: ConvertDocumentOptions) {
-  console.error('🔄 检测到 HTML 转 DOCX 转换...');
-  console.error(`📄 输入: ${inputPath}`);
-  console.error(`📁 输出: ${finalOutputPath}`);
-
   try {
     const result = await convertHtmlToDocx(inputPath, finalOutputPath, {
       preserveStyles: options.preserveFormatting !== false,
-      debug: true,
-    });
-
-    console.error('📊 HTML 转 DOCX 结果:', {
-      success: result.success,
-      outputPath: result.outputPath,
-      error: result.error,
+      debug: false,
     });
 
     if (result.success) {
@@ -669,7 +616,6 @@ async function convertHtmlToDocxSpecial(inputPath: string, finalOutputPath: stri
       throw new Error(result.error ?? 'HTML 转 DOCX 失败');
     }
   } catch (conversionError: any) {
-    console.error('❌ HTML 转 DOCX 转换失败:', conversionError.message);
     return {
       success: false,
       error: `HTML 转 DOCX 失败: ${conversionError.message}`,
@@ -678,19 +624,9 @@ async function convertHtmlToDocxSpecial(inputPath: string, finalOutputPath: stri
 }
 
 async function convertDocxToMarkdownSpecial(inputPath: string, finalOutputPath: string, options: ConvertDocumentOptions) {
-  console.error('🔄 检测到 DOCX 转 Markdown 转换...');
-  console.error(`📄 输入: ${inputPath}`);
-  console.error(`📁 输出: ${finalOutputPath}`);
-
   try {
     const result = await convertDocxToMarkdown(inputPath, finalOutputPath, {
       preserveFormatting: options.preserveFormatting !== false,
-    });
-
-    console.error('📊 DOCX 转 Markdown 结果:', {
-      success: result.success,
-      outputPath: result.outputPath,
-      error: result.error,
     });
 
     if (result.success) {
@@ -707,7 +643,6 @@ async function convertDocxToMarkdownSpecial(inputPath: string, finalOutputPath: 
       throw new Error(result.error ?? 'DOCX 转 Markdown 失败');
     }
   } catch (conversionError: any) {
-    console.error('❌ DOCX 转 Markdown 转换失败:', conversionError.message);
     return {
       success: false,
       error: `DOCX 转 Markdown 失败: ${conversionError.message}`,
@@ -716,23 +651,16 @@ async function convertDocxToMarkdownSpecial(inputPath: string, finalOutputPath: 
 }
 
 async function convertDocxToHtmlSpecial(inputPath: string, finalOutputPath: string) {
-  console.error('🔄 检测到 DOCX 转 HTML 转换...');
-  console.error(`📄 输入: ${inputPath}`);
-  console.error(`📁 输出: ${finalOutputPath}`);
-
   try {
     const validatedInputPath = validatePath(inputPath);
     
-    // 优先尝试自定义OOXML解析器
-    console.error('🚀 优先使用自定义OOXML解析器...');
+    // 使用自定义OOXML解析器
     const ooxmlResult = await convertDocxToHtmlWithOOXML(validatedInputPath, {
       preserveImages: true,
-      debug: true,
+      debug: false,
     });
 
     if (ooxmlResult.success && ooxmlResult.content) {
-      console.error('✅ 自定义OOXML解析器转换成功');
-      
       // 写入HTML文件
       await fs.writeFile(finalOutputPath, ooxmlResult.content, 'utf-8');
 
@@ -751,7 +679,6 @@ async function convertDocxToHtmlSpecial(inputPath: string, finalOutputPath: stri
     // OOXML解析器失败，抛出错误
     throw new Error('OOXML解析器转换失败，无法处理该DOCX文件');
   } catch (conversionError: any) {
-    console.error('❌ DOCX 转 HTML 转换失败:', conversionError.message);
     return {
       success: false,
       error: `DOCX 转 HTML 失败: ${conversionError.message}`,
@@ -760,21 +687,11 @@ async function convertDocxToHtmlSpecial(inputPath: string, finalOutputPath: stri
 }
 
 async function convertHtmlToPdfSpecial(inputPath: string, finalOutputPath: string, options: ConvertDocumentOptions) {
-  console.error('🔄 检测到 HTML 转 PDF 转换...');
-  console.error(`📄 输入: ${inputPath}`);
-  console.error(`📁 输出: ${finalOutputPath}`);
-
   try {
     const result = await convertHtmlToPdf(inputPath, {
       outputPath: finalOutputPath,
       preserveStyles: options.preserveFormatting !== false,
-      debug: true,
-    });
-
-    console.error('📊 HTML 转 PDF 结果:', {
-      success: result.success,
-      outputPath: result.outputPath,
-      error: result.error,
+      debug: false,
     });
 
     if (result.success) {
@@ -790,7 +707,6 @@ async function convertHtmlToPdfSpecial(inputPath: string, finalOutputPath: strin
       throw new Error(result.error ?? 'HTML 转 PDF 失败');
     }
   } catch (conversionError: any) {
-    console.error('❌ HTML 转 PDF 转换失败:', conversionError.message);
     return {
       success: false,
       error: `HTML 转 PDF 失败: ${conversionError.message}`,
@@ -800,7 +716,6 @@ async function convertHtmlToPdfSpecial(inputPath: string, finalOutputPath: strin
 
 function applyRegexReplacement(content: string, replacement: any): string {
   if (replacement.oldText.length > 100) {
-    console.warn('正则表达式过长，跳过处理');
     return content;
   }
   
@@ -809,14 +724,12 @@ function applyRegexReplacement(content: string, replacement: any): string {
     const regex = new RegExp(replacement.oldText, flags);
     return content.replace(regex, replacement.newText);
   } catch (error: any) {
-    console.warn('正则表达式无效，跳过处理:', error.message);
     return content;
   }
 }
 
 function applyPlainTextReplacement(content: string, replacement: any): string {
   if (replacement.oldText.length > 100) {
-    console.warn('搜索文本过长，跳过处理');
     return content;
   }
 
@@ -826,7 +739,6 @@ function applyPlainTextReplacement(content: string, replacement: any): string {
       : new RegExp(replacement.oldText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi');
     return content.replace(searchValue, replacement.newText);
   } catch (error: any) {
-    console.warn('文本替换失败，跳过处理:', error.message);
     return content;
   }
 }
@@ -946,21 +858,11 @@ function checkWatermarkAndQRConfig(options: any): { hasWatermark: boolean, hasQR
     defaultResourcePaths.defaultQrCodePath &&
     fsSync.existsSync(defaultResourcePaths.defaultQrCodePath);
 
-  if (hasWatermark) {
-    console.error(`🎨 检测到水印图片: ${defaultResourcePaths.defaultWatermarkPath}`);
-  }
-  if (hasQRCode) {
-    console.error(`📱 检测到二维码图片: ${defaultResourcePaths.defaultQrCodePath}`);
-  }
-
   return { hasWatermark, hasQRCode };
 }
 
 function logConversionStart(inputPath: string, finalOutputPath: string) {
-  console.error(`🚀 开始优化的 DOCX 到 PDF 转换...`);
-  console.error(`📄 输入文件: ${inputPath}`);
-  console.error(`📁 输出路径: ${finalOutputPath}`);
-  console.error(`🌍 输出目录由环境变量控制: OUTPUT_DIR=${defaultResourcePaths.outputDir}`);
+  // Conversion logging removed for production
 }
 
 function createMcpCommands(result: any, hasWatermark: boolean, hasQRCode: boolean): string[] {
@@ -1013,7 +915,6 @@ function createPostProcessingConfig(hasWatermark: boolean, hasQRCode: boolean) {
 }
 
 async function addWatermarkToPdf(outputPath: string): Promise<{ success: boolean, error?: string }> {
-  console.error(`🎨 自动添加水印...`);
   try {
     // @ts-ignore
     const watermarkResult = await addWatermark(outputPath, {
@@ -1025,20 +926,16 @@ async function addWatermarkToPdf(outputPath: string): Promise<{ success: boolean
     });
 
     if (watermarkResult.success) {
-      console.error(`✅ 水印添加成功`);
       return { success: true };
     } else {
-      console.error(`⚠️ 水印添加失败: ${watermarkResult.error}`);
       return { success: false, error: watermarkResult.error };
     }
   } catch (watermarkError: any) {
-    console.error(`❌ 水印添加异常: ${watermarkError.message}`);
     return { success: false, error: watermarkError.message };
   }
 }
 
 async function addQRCodeToPdf(outputPath: string): Promise<{ success: boolean, error?: string }> {
-  console.error(`📱 添加二维码...`);
   try {
     // @ts-ignore
     const qrResult = await addQRCode(outputPath, defaultQrCodePath, {
@@ -1049,14 +946,11 @@ async function addQRCodeToPdf(outputPath: string): Promise<{ success: boolean, e
     });
 
     if (qrResult.success) {
-      console.error(`✅ 二维码添加成功`);
       return { success: true };
     } else {
-      console.error(`⚠️ 二维码添加失败: ${qrResult.error}`);
       return { success: false, error: qrResult.error };
     }
   } catch (qrError: any) {
-    console.error(`❌ 二维码添加异常: ${qrError.message}`);
     return { success: false, error: qrError.message };
   }
 }
@@ -1135,14 +1029,6 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
     };
 
     if (result.success) {
-      console.error(`✅ 转换准备完成!`);
-      console.error(`📊 转换统计:`);
-      console.error(`  - 原始格式: ${result.details.originalFormat}`);
-      console.error(`  - 目标格式: ${result.details.targetFormat}`);
-      console.error(`  - 样式保留: ${result.details.stylesPreserved ? '✅' : '❌'}`);
-      console.error(`  - 图片保留: ${result.details.imagesPreserved ? '✅' : '❌'}`);
-      console.error(`  - 转换时间: ${result.details.conversionTime}ms`);
-
       if (result.requiresExternalTool) {
         const mcpCommands = createMcpCommands(result, hasWatermark, hasQRCode);
         const postProcessingConfig = createPostProcessingConfig(hasWatermark, hasQRCode);
@@ -1184,8 +1070,6 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
       throw new Error('OOXML转换器转换失败');
     }
   } catch (error: any) {
-    console.error('❌ 优化转换失败，尝试回退方案:', error.message);
-
     // 回退到原有的转换逻辑（简化版）
     return await fallbackConvertDocxToPdf(inputPath, finalOutputPath, options);
   }
@@ -1203,46 +1087,21 @@ function resolveFallbackOutputPath(inputPath: string, outputPath?: string): stri
 }
 
 function logFallbackConversionStart(docxPath: string, finalOutputPath: string) {
-  console.error(`🔄 使用回退方案进行 DOCX 到 PDF 转换...`);
-  console.error(`📄 输入: ${docxPath}`);
-  console.error(`📁 输出: ${finalOutputPath}`);
-  console.error(`🌍 输出目录由环境变量控制: OUTPUT_DIR=${defaultResourcePaths.outputDir}`);
+  // Fallback conversion logging removed for production
 }
 
 async function tryCustomOOXMLForPdf(docxPath: string): Promise<{ success: boolean, content?: string }> {
   try {
-    console.error('🚀 PDF转换中尝试自定义OOXML解析器...');
     const ooxmlResult = await convertDocxToHtmlWithOOXML(docxPath, {
       preserveImages: true,
-      debug: true,
+      debug: false,
     });
 
     if (ooxmlResult.success && ooxmlResult.content) {
-      console.error('✅ PDF转换中自定义OOXML解析器成功！');
-      
-      // 检查列表渲染情况
-      const listMatches = ooxmlResult.content.match(/<[uo]l[^>]*>[\s\S]*?<\/[uo]l>/g);
-      if (listMatches) {
-        console.error(`📋 检测到 ${listMatches.length} 个列表`);
-        listMatches.forEach((list, i) => {
-          console.error(`列表 ${i+1}: ${list.substring(0, 100)}...`);
-        });
-      } else {
-        console.error('⚠️ 未检测到列表标签，检查段落内容...');
-        const paragraphs = ooxmlResult.content.match(/<p[^>]*>[^<]*[工作时间|午休时间|因工作安排][^<]*<\/p>/g);
-        if (paragraphs) {
-          console.error(`📝 找到 ${paragraphs.length} 个可能的列表段落:`);
-          paragraphs.forEach((p, i) => {
-            console.error(`段落 ${i+1}: ${p}`);
-          });
-        }
-      }
-      
       return { success: true, content: ooxmlResult.content };
     }
     return { success: false };
   } catch (ooxmlError: any) {
-    console.error('❌ PDF转换中自定义OOXML解析器失败:', ooxmlError.message);
     return { success: false };
   }
 }
@@ -1259,7 +1118,6 @@ async function fallbackConvertDocxToPdf(inputPath: string, outputPath?: string, 
 
   // 生成HTML内容
   const perfectWordHtml = await generateHtmlContent(docxPath, options);
-  console.error(`🎨 HTML 生成完成 (长度: ${perfectWordHtml.length})`);
 
   // 处理样式和HTML结构
   const finalHtml = await processHtmlStyles(perfectWordHtml, options);
@@ -1305,8 +1163,6 @@ async function processHtmlStyles(html: string, options: any): Promise<string> {
 
 // 添加缺失样式的辅助函数
 function addMissingStyles(html: string, options: any): string {
-  console.error('⚠️ 检测到样式缺失，强制注入Word样式...');
-  
   const contentWithoutWrapper = html
     .replace(/<!DOCTYPE[^>]*>/gi, '')
     .replace(/<html[^>]*>/gi, '')
@@ -1383,7 +1239,6 @@ function extractStyleContent(html: string): string[] {
 
 // 获取基本Word样式的辅助函数
 function getBasicWordStyles(): string {
-  console.error('⚠️ 未找到有效样式内容，添加基本Word样式');
   return `
     body { font-family: "Calibri", "Microsoft YaHei", "SimSun", sans-serif !important; }
     p { margin-bottom: 8pt !important; line-height: 1.08 !important; }
@@ -1484,17 +1339,9 @@ async function createAndValidateHtmlFile(finalHtml: string, options: any): Promi
   const tempHtmlPath = createSecureTempPath('docx-conversion', '.html');
   // Write file with secure permissions
   await fs.writeFile(tempHtmlPath, finalHtml, { encoding: 'utf8', mode: defaultSecurityConfig.tempFilePermissions });
-  // HTML file with style fixes created
   
   const writtenContent = await fs.readFile(tempHtmlPath, 'utf8');
   const validationResult = validateHtmlContent(writtenContent);
-  
-  console.error('🔍 样式修复验证:', {
-    filePath: tempHtmlPath,
-    fileSize: writtenContent.length,
-    ...validationResult,
-    contentPreview: writtenContent.substring(0, 500) + '...',
-  });
   
   if (!validationResult.isValid) {
     await forceInjectWordStyles(tempHtmlPath, writtenContent, options);
@@ -1542,8 +1389,6 @@ async function cleanupTempFile(filePath: string): Promise<void> {
 }
 
 async function forceInjectWordStyles(tempHtmlPath: string, content: string, options: any): Promise<void> {
-  // Style fix failed, manually injecting Word styles
-  
   const perfectHtml = createPerfectWordHtml('', options);
   const wordStylesRaw = perfectHtml.match(/<style[^>]*>[\s\S]*?<\/style>/gi)?.[0] ?? '';
   
@@ -1572,7 +1417,6 @@ ${sanitizedBodyContent}
   
   // Write file with secure permissions
   await fs.writeFile(tempHtmlPath, enforcedHtml, { encoding: 'utf8', mode: defaultSecurityConfig.tempFilePermissions });
-  // Style injection completed
 }
 
 // 提取body内容的辅助函数
@@ -1656,7 +1500,6 @@ function createPlaywrightSteps(finalOutputPath: string, tempHtmlPath: string) {
           function ensureStylesApplied() {
             const styles = document.querySelectorAll('style');
             if (styles.length === 0) {
-              console.error('警告: 未找到样式标签');
               const style = document.createElement('style');
               style.textContent = 'body { font-family: "Calibri", "Microsoft YaHei", sans-serif !important; } * { -webkit-print-color-adjust: exact !important; }';
               document.head.appendChild(style);
@@ -2461,9 +2304,7 @@ function resolveMarkdownPdfOutputPath(inputPath: string, outputPath?: string): s
 }
 
 function logMarkdownConversionStart(inputPath: string, outputPath: string): void {
-  console.error(`🔄 Markdown 到 PDF 转换...`);
-  console.error(`📄 输入: ${inputPath}`);
-  console.error(`📁 输出: ${outputPath}`);
+  // Markdown conversion logging removed for production
 }
 
 function createMarkdownPlaywrightCommands(htmlOutputPath: string, finalOutputPath: string): string[] {
@@ -2512,8 +2353,7 @@ async function convertMarkdownToPdf(inputPath: string, outputPath?: string, opti
       throw new Error(`Markdown 到 HTML 转换失败: ${htmlResult.error}`);
     }
 
-    console.error(`✅ Markdown 到 HTML 转换成功: ${htmlOutputPath}`);
-    console.error(`📋 下一步：使用 playwright-mcp 将 HTML 转换为 PDF`);
+    // Markdown to HTML conversion completed
 
     // 获取水印和二维码配置
     const defaultWatermarkPath = process.env.WATERMARK_IMAGE ?? null;
@@ -2542,7 +2382,6 @@ async function convertMarkdownToPdf(inputPath: string, outputPath?: string, opti
       },
     };
   } catch (error: any) {
-    console.error('❌ Markdown 到 PDF 转换失败:', error.message);
     return {
       success: false,
       error: error.message,
@@ -2562,9 +2401,7 @@ function resolveDocxToMarkdownOutputPath(inputPath: string, outputPath?: string)
 }
 
 function logDocxToMarkdownConversionStart(inputPath: string, outputPath: string): void {
-  console.error(`🔄 DOCX 到 Markdown 转换...`);
-  console.error(`📄 输入: ${inputPath}`);
-  console.error(`📁 输出: ${outputPath}`);
+  // DOCX to Markdown conversion logging removed for production
 }
 
 // DOCX 转 Markdown 函数
@@ -2579,7 +2416,7 @@ async function convertDocxToMarkdown(inputPath: string, outputPath?: string, opt
     // 先转换为HTML，然后转换为Markdown
     const htmlResult = await convertDocxToHtmlWithOOXML(inputPath, {
       preserveImages: false,
-      debug: true,
+      debug: false,
     });
     
     if (!htmlResult.success) {
@@ -2598,7 +2435,6 @@ async function convertDocxToMarkdown(inputPath: string, outputPath?: string, opt
     };
 
     if (result.success) {
-      console.error(`✅ DOCX 到 Markdown 转换成功: ${finalOutputPath}`);
       return {
         success: true,
         outputPath: finalOutputPath,
@@ -2608,7 +2444,6 @@ async function convertDocxToMarkdown(inputPath: string, outputPath?: string, opt
       throw new Error(result.error || 'DOCX 到 Markdown 转换失败');
     }
   } catch (error: any) {
-    console.error('❌ DOCX 到 Markdown 转换失败:', error.message);
     return {
       success: false,
       error: error.message,
@@ -2628,9 +2463,7 @@ function resolveDocxToTxtOutputPath(inputPath: string, outputPath?: string): str
 }
 
 function logDocxToTxtConversionStart(inputPath: string, outputPath: string): void {
-  console.error(`🔄 DOCX 到 TXT 转换...`);
-  console.error(`📄 输入: ${inputPath}`);
-  console.error(`📁 输出: ${outputPath}`);
+  // DOCX to TXT conversion logging removed for production
 }
 
 // DOCX 转 TXT 函数
@@ -2645,7 +2478,7 @@ async function convertDocxToTxt(inputPath: string, outputPath?: string, options:
     // 先转换为 HTML，然后提取纯文本
     const htmlResult = await convertDocxToHtmlWithOOXML(inputPath, {
       preserveImages: false,
-      debug: true,
+      debug: false,
     });
 
     if (!htmlResult.success) {
@@ -2671,14 +2504,12 @@ async function convertDocxToTxt(inputPath: string, outputPath?: string, options:
     // 写入文件
     await fs.writeFile(finalOutputPath, textContent, 'utf-8');
 
-    console.error(`✅ DOCX 到 TXT 转换成功: ${finalOutputPath}`);
     return {
       success: true,
       outputPath: finalOutputPath,
       message: 'DOCX 到 TXT 转换完成',
     };
   } catch (error: any) {
-    console.error('❌ DOCX 到 TXT 转换失败:', error.message);
     return {
       success: false,
       error: error.message,
@@ -2729,7 +2560,6 @@ ${content}
     // 写入文件
     await fs.writeFile(finalOutputPath, docxBuffer);
 
-    console.error(`✅ Word 文档创建成功: ${finalOutputPath}`);
     return {
       success: true,
       outputPath: finalOutputPath,
@@ -2741,7 +2571,6 @@ ${content}
       },
     };
   } catch (error: any) {
-    console.error('❌ Word 文档创建失败:', error.message);
     return {
       success: false,
       error: error.message,
@@ -2760,10 +2589,6 @@ async function convertMarkdownToTxt(inputPath: string, outputPath?: string, opti
     } else if (!path.isAbsolute(finalOutputPath)) {
       finalOutputPath = path.join(defaultResourcePaths.outputDir, finalOutputPath);
     }
-
-    console.error(`🔄 Markdown 到 TXT 转换...`);
-    console.error(`📄 输入: ${inputPath}`);
-    console.error(`📁 输出: ${finalOutputPath}`);
 
     // 确保输出目录存在
     await fs.mkdir(path.dirname(finalOutputPath), { recursive: true });
@@ -2792,14 +2617,12 @@ async function convertMarkdownToTxt(inputPath: string, outputPath?: string, opti
     // 写入文件
     await fs.writeFile(finalOutputPath, textContent, 'utf-8');
 
-    console.error(`✅ Markdown 到 TXT 转换成功: ${finalOutputPath}`);
     return {
       success: true,
       outputPath: finalOutputPath,
       message: 'Markdown 到 TXT 转换完成',
     };
   } catch (error: any) {
-    console.error('❌ Markdown 到 TXT 转换失败:', error.message);
     return {
       success: false,
       error: error.message,
