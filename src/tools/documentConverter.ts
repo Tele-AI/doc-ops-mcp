@@ -32,6 +32,19 @@ interface ConversionOptions {
       text?: string;
     };
   };
+  // PDF水印配置
+  watermark?: {
+    enabled?: boolean; // 是否启用水印，PDF格式默认为true
+    text?: string; // 水印文字，默认为'doc-ops-mcp'
+    imagePath?: string; // 水印图片路径，如果提供则优先使用图片
+    opacity?: number; // 透明度，0-1之间，默认0.1
+    fontSize?: number; // 文字水印字体大小，默认48
+    rotation?: number; // 旋转角度，默认-45度
+    spacing?: {
+      x?: number; // 水印间距X，默认200
+      y?: number; // 水印间距Y，默认150
+    };
+  };
 }
 
 interface DocumentConversionResult {
@@ -72,13 +85,28 @@ export class DocumentConverter {
       const outputPath =
         options.outputPath ?? this.generateOutputPath(content.title ?? 'document', options.format);
 
+      // 为PDF格式设置默认水印配置
+      if (options.format === 'pdf' && !options.watermark) {
+        options.watermark = {
+          enabled: true,
+          text: 'doc-ops-mcp',
+          opacity: 0.1,
+          fontSize: 48,
+          rotation: -45,
+          spacing: {
+            x: 200,
+            y: 150
+          }
+        };
+      }
+
       switch (options.format) {
         case 'md':
           return await this.convertToMarkdown(content, outputPath);
         case 'html':
           return await this.convertToHTML(content, outputPath, styling);
         case 'pdf':
-          return await this.convertToPDF(content, outputPath, styling);
+          return await this.convertToPDF(content, outputPath, styling, options.watermark);
         case 'docx':
           return await this.convertToDocx(content, outputPath, styling);
         default:
@@ -301,7 +329,8 @@ export class DocumentConverter {
   private async convertToPDF(
     content: DocumentContent,
     outputPath: string,
-    styling: any
+    styling: any,
+    watermarkConfig?: any
   ): Promise<DocumentConversionResult> {
     try {
       // 使用pdf-lib直接生成PDF，类似Word转PDF的方式
@@ -364,6 +393,11 @@ export class DocumentConverter {
 
       for (const line of lines) {
         if (yPosition < styling.margins.bottom + lineHeight) {
+          // 为当前页面添加水印
+          if (watermarkConfig?.enabled !== false) {
+            await this.addWatermarkToPage(currentPage, watermarkConfig, pdfDoc);
+          }
+          
           // 添加新页面
           currentPage = pdfDoc.addPage();
           yPosition = currentPage.getSize().height - styling.margins.top;
@@ -381,6 +415,11 @@ export class DocumentConverter {
         });
 
         yPosition -= lineHeight * (line.isHeading ? 1.5 : 1);
+      }
+
+      // 为最后一页添加水印
+      if (watermarkConfig?.enabled !== false) {
+        await this.addWatermarkToPage(currentPage, watermarkConfig, pdfDoc);
       }
 
       const pdfBytes = await pdfDoc.save();
@@ -1088,6 +1127,121 @@ export class DocumentConverter {
       );
     }
     return rgb(0, 0, 0);
+  }
+
+  /**
+   * 为PDF页面添加水印
+   */
+  private async addWatermarkToPage(page: any, watermarkConfig: any, pdfDoc: any): Promise<void> {
+    if (!watermarkConfig || watermarkConfig.enabled === false) {
+      return;
+    }
+
+    const { width, height } = page.getSize();
+    const { StandardFonts, rgb } = await import('pdf-lib');
+    
+    // 水印配置默认值
+    const config = {
+      text: watermarkConfig.text || 'doc-ops-mcp',
+      opacity: watermarkConfig.opacity || 0.1,
+      fontSize: watermarkConfig.fontSize || 48,
+      rotation: watermarkConfig.rotation || -45,
+      spacing: {
+        x: watermarkConfig.spacing?.x || 200,
+        y: watermarkConfig.spacing?.y || 150
+      }
+    };
+
+    // 如果提供了图片路径，优先使用图片水印
+    if (watermarkConfig.imagePath && fs.existsSync(watermarkConfig.imagePath)) {
+      try {
+        const readFile = promisify(fs.readFile);
+        const imageBytes = await readFile(watermarkConfig.imagePath);
+        let image;
+        
+        // 根据文件扩展名判断图片类型
+        const ext = watermarkConfig.imagePath.toLowerCase().split('.').pop();
+        if (ext === 'png') {
+          image = await pdfDoc.embedPng(imageBytes);
+        } else if (ext === 'jpg' || ext === 'jpeg') {
+          image = await pdfDoc.embedJpg(imageBytes);
+        } else {
+           console.warn('不支持的图片格式，使用文字水印');
+           await this.addTextWatermark(page, config, width, height, pdfDoc);
+           return;
+         }
+
+        // 绘制图片水印
+        const imageSize = Math.min(width, height) * 0.3; // 图片大小为页面最小边的30%
+        
+        // 计算水印位置，规则铺满页面
+        for (let x = -imageSize; x < width + imageSize; x += config.spacing.x) {
+          for (let y = -imageSize; y < height + imageSize; y += config.spacing.y) {
+            page.drawImage(image, {
+              x: x,
+              y: y,
+              width: imageSize,
+              height: imageSize,
+              opacity: config.opacity,
+              rotate: {
+                type: 'degrees',
+                angle: config.rotation,
+              },
+            });
+          }
+        }
+      } catch (error) {
+         console.warn('图片水印添加失败，使用文字水印:', error);
+         await this.addTextWatermark(page, config, width, height, pdfDoc);
+       }
+    } else {
+       // 使用文字水印
+       await this.addTextWatermark(page, config, width, height, pdfDoc);
+     }
+  }
+
+  /**
+   * 添加文字水印
+   */
+  private async addTextWatermark(page: any, config: any, width: number, height: number, pdfDoc?: any): Promise<void> {
+    const { StandardFonts, rgb } = await import('pdf-lib');
+    // 如果没有传入pdfDoc，尝试从page获取，否则创建新的字体
+    let font;
+    try {
+      font = await (pdfDoc || page.doc).embedFont(StandardFonts.Helvetica);
+    } catch {
+      // 如果无法获取字体，使用默认字体
+      font = StandardFonts.Helvetica;
+    }
+    
+    // 计算文字水印的位置，斜着规则铺满页面
+    const textWidth = config.text.length * config.fontSize * 0.6; // 估算文字宽度
+    const textHeight = config.fontSize;
+    
+    // 计算旋转后的实际占用空间
+    const radians = (config.rotation * Math.PI) / 180;
+    const cos = Math.abs(Math.cos(radians));
+    const sin = Math.abs(Math.sin(radians));
+    const rotatedWidth = textWidth * cos + textHeight * sin;
+    const rotatedHeight = textWidth * sin + textHeight * cos;
+    
+    // 规则铺满页面
+    for (let x = -rotatedWidth; x < width + rotatedWidth; x += config.spacing.x) {
+      for (let y = -rotatedHeight; y < height + rotatedHeight; y += config.spacing.y) {
+        page.drawText(config.text, {
+          x: x,
+          y: y,
+          size: config.fontSize,
+          font: font,
+          color: rgb(0.5, 0.5, 0.5), // 灰色
+          opacity: config.opacity,
+          rotate: {
+            type: 'degrees',
+            angle: config.rotation,
+          },
+        });
+      }
+    }
   }
 
   /**
