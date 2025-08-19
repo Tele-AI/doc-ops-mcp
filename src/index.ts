@@ -864,7 +864,7 @@ function checkWatermarkAndQRConfig(options: any): { hasWatermark: boolean, hasQR
 function createMcpCommands(result: any, hasWatermark: boolean, hasQRCode: boolean): string[] {
   const mcpCommands = [
     `browser_navigate("file://${result.htmlPath}")`,
-    `browser_wait_for({ time: 1 })`,
+    `browser_wait_for({ time: 3 })`,
     `browser_pdf_save({ filename: "${result.outputPath}" })`,
   ];
 
@@ -1046,7 +1046,7 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
             required: true,
             commands: [
               `browser_navigate("file://${result.htmlPath}")`,
-              `browser_wait_for({ time: 1 })`,
+              `browser_wait_for({ time: 3 })`,
               `browser_pdf_save({ filename: "${result.outputPath}" })`,
             ],
             reason: 'PDF 转换需要 playwright-mcp 浏览器实例',
@@ -2434,7 +2434,7 @@ function resolveMarkdownPdfOutputPath(inputPath: string, outputPath?: string): s
 function createMarkdownPlaywrightCommands(htmlOutputPath: string, finalOutputPath: string): string[] {
   return [
     `browser_navigate("file://${htmlOutputPath}")`,
-    `browser_wait_for({ time: 1 })`,
+    `browser_wait_for({ time: 3 })`,
     `browser_pdf_save({ filename: "${finalOutputPath}" })`,
   ];
 }

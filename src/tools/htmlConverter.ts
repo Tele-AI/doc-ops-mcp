@@ -118,7 +118,7 @@ HTML 转 PDF 转换 - 需要 playwright-mcp 完成
   请运行以下命令完成 PDF 转换:
   
   1. browser_navigate("file://${path.resolve(inputPath)}")
-  2. browser_wait_for({ time: 1 })
+  2. browser_wait_for({ time: 3 })
   3. browser_pdf_save({ filename: "${outputPath}" })
 
 📁 最终输出: ${outputPath}
