@@ -2013,10 +2013,11 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
           font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         }
 
-        // 计算水印的间距和位置，实现斜着排列的效果
+        // 计算水印的间距和位置，实现斜向平铺效果
+        const angle = -30; // 负角度，从左上到右下
         const watermarkSpacing = {
-          x: 250, // 减小水平间距，更密集
-          y: 150  // 减小垂直间距，更密集
+          x: fontSize * 4, // 基于字体大小的间距
+          y: fontSize * 3
         };
         
         // 计算文字宽度和高度（估算）
@@ -2024,23 +2025,27 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
         const textHeight = fontSize;
         
         // 计算旋转后的实际占用空间
-        const radians = (45 * Math.PI) / 180;
+        const radians = (angle * Math.PI) / 180;
         const cos = Math.abs(Math.cos(radians));
         const sin = Math.abs(Math.sin(radians));
         const rotatedWidth = textWidth * cos + textHeight * sin;
         const rotatedHeight = textWidth * sin + textHeight * cos;
         
-        // 规则铺满页面，斜着排列
-        for (let x = -rotatedWidth; x < width + rotatedWidth; x += watermarkSpacing.x) {
-          for (let y = -rotatedHeight; y < height + rotatedHeight; y += watermarkSpacing.y) {
+        // 计算起始偏移，确保从页面边缘开始
+        const startX = -rotatedWidth;
+        const startY = height + rotatedHeight;
+        
+        // 规则铺满页面，斜向排列
+        for (let x = startX; x < width + rotatedWidth * 2; x += watermarkSpacing.x) {
+          for (let y = startY; y > -rotatedHeight * 2; y -= watermarkSpacing.y) {
             page.drawText(watermarkText, {
                x: x,
                y: y,
                size: fontSize,
                font,
-               color: rgb(0.8, 0.8, 0.8), // 更浅的灰色
-               opacity,
-               rotate: degrees(45),
+               color: rgb(0.85, 0.85, 0.85), // 更浅的灰色，更不易察觉
+               opacity: opacity,
+               rotate: degrees(angle),
              });
           }
         }
@@ -2080,14 +2085,14 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
             const imageAspectRatio = image.width / image.height;
             const pageAspectRatio = width / height;
             
-            let newWidth, newHeight;
+            let newWidth: number, newHeight: number;
             if (imageAspectRatio > pageAspectRatio) {
               // 图片更宽，以页面宽度为准
-              newWidth = width * 0.8; // 留出一些边距
+              newWidth = width * 0.6; // 留出一些边距，避免过大
               newHeight = newWidth / imageAspectRatio;
             } else {
               // 图片更高，以页面高度为准
-              newHeight = height * 0.8; // 留出一些边距
+              newHeight = height * 0.6; // 留出一些边距，避免过大
               newWidth = newHeight * imageAspectRatio;
             }
             
@@ -2100,7 +2105,7 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
               y,
               width: newWidth,
               height: newHeight,
-              opacity: opacity * 0.3, // 降低透明度，避免影响阅读
+              opacity: opacity * 0.2, // 进一步降低透明度，更不易察觉
             });
             continue; // 跳过后面的默认绘制
         }
@@ -2119,10 +2124,11 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
         const opacity = options.watermarkTextOpacity ?? 0.3;
         const watermarkText = 'doc-ops-mcp';
 
-        // 计算水印的间距和位置，实现斜着排列的效果
+        // 计算水印的间距和位置，实现斜向平铺效果
+        const angle = -30; // 负角度，从左上到右下
         const watermarkSpacing = {
-          x: 250, // 减小水平间距，更密集
-          y: 150  // 减小垂直间距，更密集
+          x: fontSize * 4, // 基于字体大小的间距
+          y: fontSize * 3
         };
         
         // 计算文字宽度和高度（估算）
@@ -2130,23 +2136,27 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
         const textHeight = fontSize;
         
         // 计算旋转后的实际占用空间
-        const radians = (45 * Math.PI) / 180;
+        const radians = (angle * Math.PI) / 180;
         const cos = Math.abs(Math.cos(radians));
         const sin = Math.abs(Math.sin(radians));
         const rotatedWidth = textWidth * cos + textHeight * sin;
         const rotatedHeight = textWidth * sin + textHeight * cos;
         
-        // 规则铺满页面，斜着排列
-        for (let x = -rotatedWidth; x < width + rotatedWidth; x += watermarkSpacing.x) {
-          for (let y = -rotatedHeight; y < height + rotatedHeight; y += watermarkSpacing.y) {
+        // 计算起始偏移，确保从页面边缘开始
+        const startX = -rotatedWidth;
+        const startY = height + rotatedHeight;
+        
+        // 规则铺满页面，斜向排列
+        for (let x = startX; x < width + rotatedWidth * 2; x += watermarkSpacing.x) {
+          for (let y = startY; y > -rotatedHeight * 2; y -= watermarkSpacing.y) {
             page.drawText(watermarkText, {
                x: x,
                y: y,
                size: fontSize,
                font,
-               color: rgb(0.8, 0.8, 0.8), // 更浅的灰色
-               opacity,
-               rotate: degrees(45),
+               color: rgb(0.85, 0.85, 0.85), // 更浅的灰色，更不易察觉
+               opacity: opacity,
+               rotate: degrees(angle),
              });
           }
         }
@@ -2295,22 +2305,30 @@ function resolvePostProcessingPath(playwrightPdfPath: string, targetPath?: strin
 }
 
 async function processWatermarkAddition(finalPath: string, options: any): Promise<any> {
-  // 只有在用户明确要求添加水印时才处理
-  if (!options.addWatermark) {
+  // 检查是否应该添加水印：用户明确要求 OR 环境变量设置 OR 默认文字
+  const shouldAddWatermark = options.addWatermark || 
+                           (process.env.WATERMARK_IMAGE && fsSync.existsSync(process.env.WATERMARK_IMAGE)) ||
+                           options.watermarkText;
+  
+  if (!shouldAddWatermark) {
     return null;
   }
 
-  // 优先级：用户明确提供的参数 > 环境变量 > 默认值
+  // 优先级：用户文字 > 用户图片 > 环境变量图片 > 默认文字
+  const useText = options.watermarkText || (!process.env.WATERMARK_IMAGE || !fsSync.existsSync(process.env.WATERMARK_IMAGE));
+  const watermarkText = useText ? (options.watermarkText || 'doc-ops-mcp') : undefined;
+  const watermarkImage = !useText ? (options.watermarkImage || process.env.WATERMARK_IMAGE) : undefined;
+  
   const watermarkOptions = {
     // 用户明确提供的图片地址具有最高优先级
-    watermarkImage: options.watermarkImage || process.env.WATERMARK_IMAGE,
+    watermarkImage: watermarkImage,
     // 用户明确提供的文字具有最高优先级
-    watermarkText: options.watermarkText,
+    watermarkText: watermarkText,
     watermarkImageScale: options.watermarkImageScale ?? 0.25,
-    watermarkImageOpacity: options.watermarkImageOpacity ?? 0.6,
-    watermarkImagePosition: options.watermarkImagePosition ?? 'top-right',
-    watermarkFontSize: options.watermarkFontSize ?? 8,
-    watermarkTextOpacity: options.watermarkTextOpacity ?? 0.3,
+    watermarkImageOpacity: options.watermarkImageOpacity ?? 0.3, // 降低默认透明度
+    watermarkImagePosition: options.watermarkImagePosition ?? 'fullscreen', // 默认全屏平铺
+    watermarkFontSize: options.watermarkFontSize ?? 12, // 增大字体
+    watermarkTextOpacity: options.watermarkTextOpacity ?? 0.15, // 降低文字透明度
   };
 
   try {
