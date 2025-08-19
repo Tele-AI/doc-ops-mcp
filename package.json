@@ -24,9 +24,11 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
+    "@types/fontkit": "^2.0.8",
     "@types/marked": "^5.0.2",
     "cheerio": "^1.0.0-rc.12",
     "docx": "^9.5.1",
+    "fontkit": "^2.0.4",
     "jszip": "^3.10.1",
     "marked": "^15.0.12",
     "pdf-lib": "^1.17.1",

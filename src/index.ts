@@ -864,7 +864,7 @@ function checkWatermarkAndQRConfig(options: any): { hasWatermark: boolean, hasQR
 function createMcpCommands(result: any, hasWatermark: boolean, hasQRCode: boolean): string[] {
   const mcpCommands = [
     `browser_navigate("file://${result.htmlPath}")`,
-    `browser_wait_for({ time: 3 })`,
+    `browser_wait_for({ time: 1 })`,
     `browser_pdf_save({ filename: "${result.outputPath}" })`,
   ];
 
@@ -1040,7 +1040,7 @@ async function convertDocxToPdf(inputPath: string, outputPath?: string, options:
             required: true,
             commands: [
               `browser_navigate("file://${result.htmlPath}")`,
-              `browser_wait_for({ time: 3 })`,
+              `browser_wait_for({ time: 1 })`,
               `browser_pdf_save({ filename: "${result.outputPath}" })`,
             ],
             reason: 'PDF 转换需要 playwright-mcp 浏览器实例',
@@ -1956,10 +1956,56 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
       // 优先级：用户文字 > 用户图片 > 环境变量图片 > 默认文字
       // 如果用户明确提供了文字水印，优先使用文字水印
       if (options.watermarkText) {
-        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        let font;
         const fontSize = options.watermarkFontSize ?? 48;
         const opacity = options.watermarkTextOpacity ?? 0.3;
         const watermarkText = options.watermarkText;
+        
+        // 检查是否包含中文字符
+        const hasChinese = /[\u4e00-\u9fa5]/.test(watermarkText);
+        
+        if (hasChinese) {
+          try {
+            // 注册fontkit以支持TTF字体
+            const fontkit = await import('fontkit');
+            pdfDoc.registerFontkit(fontkit.default);
+            
+            // 尝试使用系统中文字体
+            const fontPaths = [
+              '/System/Library/Fonts/PingFang.ttc', // macOS 默认中文字体
+              '/System/Library/Fonts/Helvetica.ttc',
+              '/System/Library/Fonts/Arial Unicode MS.ttf',
+              '/Library/Fonts/Arial Unicode MS.ttf'
+            ];
+            
+            let fontBytes = null;
+            for (const fontPath of fontPaths) {
+              try {
+                if (fsSync.existsSync(fontPath)) {
+                  fontBytes = await fs.readFile(fontPath);
+                  break;
+                }
+              } catch (e) {
+                continue;
+              }
+            }
+            
+            if (fontBytes) {
+              font = await pdfDoc.embedFont(fontBytes, { subset: true });
+            } else {
+              // 如果找不到中文字体，使用默认字体
+              font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+              console.warn('未找到中文字体，将使用默认字体，中文字符可能无法正确显示');
+            }
+          } catch (e) {
+            // 字体嵌入失败，使用默认字体
+            font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+            console.warn('中文字体嵌入失败，使用默认字体:', e);
+          }
+        } else {
+          // 非中文文本使用默认字体
+          font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        }
 
         page.drawText(watermarkText, {
           x: width / 2 - (watermarkText.length * fontSize) / 4,
@@ -2320,7 +2366,7 @@ function resolveMarkdownPdfOutputPath(inputPath: string, outputPath?: string): s
 function createMarkdownPlaywrightCommands(htmlOutputPath: string, finalOutputPath: string): string[] {
   return [
     `browser_navigate("file://${htmlOutputPath}")`,
-    `browser_wait_for({ time: 3 })`,
+    `browser_wait_for({ time: 1 })`,
     `browser_pdf_save({ filename: "${finalOutputPath}" })`,
   ];
 }
