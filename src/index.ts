@@ -2,7 +2,7 @@
 // Enhanced DOCX to PDF conversion with perfect Word style replication
 
 import { SafeErrorHandler } from './security/errorHandler';
-const { PDFDocument, rgb, StandardFonts } = require('pdf-lib');
+const { PDFDocument, rgb, StandardFonts, degrees } = require('pdf-lib');
 const fsSync = require('fs');
 const os = require('os');
 const { Server } = require('@modelcontextprotocol/sdk/server/index.js');
@@ -2014,7 +2014,7 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
           font,
           color: rgb(0.5, 0.5, 0.5),
           opacity,
-          rotate: { angle: Math.PI / 4, origin: { x: width / 2, y: height / 2 } },
+          rotate: degrees(45),
         });
       } else if (options.watermarkImage && fsSync.existsSync(options.watermarkImage)) {
         const imageBytes = await fs.readFile(options.watermarkImage);
@@ -2098,7 +2098,7 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
           font,
           color: rgb(0.5, 0.5, 0.5),
           opacity,
-          rotate: { angle: Math.PI / 4, origin: { x: width / 2, y: height / 2 } },
+          rotate: degrees(45),
         });
       }
     }
