@@ -922,7 +922,7 @@ async function addWatermarkToPdf(outputPath: string): Promise<{ success: boolean
       watermarkImageOpacity: 0.6,
       watermarkImagePosition: 'top-right',
       watermarkFontSize: 8,         // 使用优化后的字体大小
-      watermarkTextOpacity: 0.01,    // 使用优化后的透明度
+      watermarkTextOpacity: 0.3,    // 使用优化后的透明度
     };
 
     const watermarkResult = await addWatermark(outputPath, watermarkOptions);
@@ -1964,7 +1964,7 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
       if (options.watermarkText) {
         let font;
         const fontSize = options.watermarkFontSize ?? 8;
-        const opacity = options.watermarkTextOpacity ?? 0.01;
+        const opacity = options.watermarkTextOpacity ?? 0.3;
         const watermarkText = options.watermarkText;
         
         // 检查是否包含中文字符
@@ -2116,7 +2116,7 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
         // 如果没有用户文字和用户图片，使用默认文字水印 'doc-ops-mcp'
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const fontSize = options.watermarkFontSize ?? 8;
-        const opacity = options.watermarkTextOpacity ?? 0.01;
+        const opacity = options.watermarkTextOpacity ?? 0.3;
         const watermarkText = 'doc-ops-mcp';
 
         // 计算水印的间距和位置，实现斜着排列的效果
@@ -2307,10 +2307,10 @@ async function processWatermarkAddition(finalPath: string, options: any): Promis
     // 用户明确提供的文字具有最高优先级
     watermarkText: options.watermarkText,
     watermarkImageScale: options.watermarkImageScale ?? 0.25,
-    watermarkImageOpacity: options.watermarkImageOpacity ?? 0.01,
+    watermarkImageOpacity: options.watermarkImageOpacity ?? 0.6,
     watermarkImagePosition: options.watermarkImagePosition ?? 'top-right',
     watermarkFontSize: options.watermarkFontSize ?? 8,
-    watermarkTextOpacity: options.watermarkTextOpacity ?? 0.01,
+    watermarkTextOpacity: options.watermarkTextOpacity ?? 0.3,
   };
 
   try {
