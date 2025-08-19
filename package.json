@@ -30,7 +30,7 @@
     "docx": "^9.5.1",
     "fontkit": "^2.0.4",
     "jszip": "^3.10.1",
-    "marked": "^15.0.12",
+    "marked": "^16.2.0",
     "pdf-lib": "^1.17.1",
     "word-extractor": "^1.0.4",
     "xml2js": "^0.6.2"
