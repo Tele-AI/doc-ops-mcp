@@ -962,8 +962,8 @@ async function handleDirectConversionSuccess(result: any, hasWatermark: boolean,
     },
   };
 
-  // 自动添加水印
-  if (hasWatermark && defaultResourcePaths.defaultWatermarkPath) {
+  // 只有在用户明确要求时才添加水印
+  if (hasWatermark) {
     const watermarkResult = await addWatermarkToPdf(result.outputPath);
     if (watermarkResult.success) {
       (finalResult as any).watermarkAdded = true;
@@ -972,9 +972,8 @@ async function handleDirectConversionSuccess(result: any, hasWatermark: boolean,
     }
   }
 
-  // 添加二维码（仅在用户明确要求时）
-  //@ts-ignore
-  if (hasQRCode && defaultQrCodePath) {
+  // 只有在用户明确要求时才添加二维码
+  if (hasQRCode) {
     const qrResult = await addQRCodeToPdf(result.outputPath);
     if (qrResult.success) {
       (finalResult as any).qrCodeAdded = true;
@@ -1954,7 +1953,24 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
     for (const page of pages) {
       const { width, height } = page.getSize();
 
-      if (options.watermarkImage) {
+      // 优先级：用户文字 > 用户图片 > 环境变量图片 > 默认文字
+      // 如果用户明确提供了文字水印，优先使用文字水印
+      if (options.watermarkText) {
+        const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
+        const fontSize = options.watermarkFontSize ?? 48;
+        const opacity = options.watermarkTextOpacity ?? 0.3;
+        const watermarkText = options.watermarkText;
+
+        page.drawText(watermarkText, {
+          x: width / 2 - (watermarkText.length * fontSize) / 4,
+          y: height / 2,
+          size: fontSize,
+          font,
+          color: rgb(0.5, 0.5, 0.5),
+          opacity,
+          rotate: { angle: Math.PI / 4, origin: { x: width / 2, y: height / 2 } },
+        });
+      } else if (options.watermarkImage && fsSync.existsSync(options.watermarkImage)) {
         const imageBytes = await fs.readFile(options.watermarkImage);
         const image = await pdfDoc.embedPng(imageBytes);
         const scale = options.watermarkImageScale ?? 0.25;
@@ -2022,15 +2038,15 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
           height: image.height * scale,
           opacity,
         });
-      }
-
-      if (options.watermarkText) {
+      } else {
+        // 如果没有用户文字和用户图片，使用默认文字水印 'doc-ops-mcp'
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const fontSize = options.watermarkFontSize ?? 48;
         const opacity = options.watermarkTextOpacity ?? 0.3;
+        const watermarkText = 'doc-ops-mcp';
 
-        page.drawText(options.watermarkText, {
-          x: width / 2 - (options.watermarkText.length * fontSize) / 4,
+        page.drawText(watermarkText, {
+          x: width / 2 - (watermarkText.length * fontSize) / 4,
           y: height / 2,
           size: fontSize,
           font,
@@ -2183,12 +2199,16 @@ function resolvePostProcessingPath(playwrightPdfPath: string, targetPath?: strin
 }
 
 async function processWatermarkAddition(finalPath: string, options: any): Promise<any> {
-  if (!(options.addWatermark || process.env.WATERMARK_IMAGE)) {
+  // 只有在用户明确要求添加水印时才处理
+  if (!options.addWatermark) {
     return null;
   }
 
+  // 优先级：用户明确提供的参数 > 环境变量 > 默认值
   const watermarkOptions = {
-    watermarkImage: options.watermarkImage ?? process.env.WATERMARK_IMAGE,
+    // 用户明确提供的图片地址具有最高优先级
+    watermarkImage: options.watermarkImage || process.env.WATERMARK_IMAGE,
+    // 用户明确提供的文字具有最高优先级
     watermarkText: options.watermarkText,
     watermarkImageScale: options.watermarkImageScale ?? 0.25,
     watermarkImageOpacity: options.watermarkImageOpacity ?? 0.6,
@@ -2205,7 +2225,8 @@ async function processWatermarkAddition(finalPath: string, options: any): Promis
 }
 
 async function processQRCodeAddition(finalPath: string, options: any): Promise<any> {
-  if (!(options.addQrCode || (options.addQrCode !== false && process.env.QR_CODE_IMAGE))) {
+  // 只有在用户明确要求添加二维码时才处理
+  if (!options.addQrCode) {
     return null;
   }
 
@@ -2220,11 +2241,13 @@ async function processQRCodeAddition(finalPath: string, options: any): Promise<a
   };
 
   try {
+    // 优先级：用户明确提供的二维码图片地址 > 环境变量
+    // 二维码只能是图片地址，不支持文字
     const qrCodePath = options.qrCodePath || process.env.QR_CODE_IMAGE;
     if (qrCodePath) {
       return await addQRCode(finalPath, qrCodePath, qrOptions);
     } else {
-      return { success: false, error: 'QR code path not provided' };
+      return { success: false, error: 'QR code image path not provided. QR code requires an image file.' };
     }
   } catch (error: any) {
     return { success: false, error: error.message };
@@ -2306,11 +2329,19 @@ function createMarkdownPostProcessingSteps(options: any): string[] {
   const postProcessingSteps: string[] = [];
   const defaultWatermarkPath = process.env.WATERMARK_IMAGE ?? null;
   const defaultQrCodePath = process.env.QR_CODE_IMAGE ?? null;
+  const addWatermark = options.addWatermark ?? false;
   const addQrCode = options.addQrCode ?? false;
 
-  if (defaultWatermarkPath) {
-    postProcessingSteps.push(`添加水印: ${defaultWatermarkPath}`);
+  // 只有在用户明确要求时才添加水印
+  if (addWatermark) {
+    const watermarkPath = options.watermarkImage || defaultWatermarkPath;
+    if (watermarkPath) {
+      postProcessingSteps.push(`添加水印: ${watermarkPath}`);
+    } else {
+      postProcessingSteps.push(`添加水印: 默认文字 'doc-ops-mcp'`);
+    }
   }
+  // 只有在用户明确要求时才添加二维码
   if (addQrCode && defaultQrCodePath) {
     postProcessingSteps.push(`添加二维码: ${defaultQrCodePath}`);
   }
@@ -2342,6 +2373,7 @@ async function convertMarkdownToPdf(inputPath: string, outputPath?: string, opti
     // 获取水印和二维码配置
     const defaultWatermarkPath = process.env.WATERMARK_IMAGE ?? null;
     const defaultQrCodePath = process.env.QR_CODE_IMAGE ?? null;
+    const addWatermark = options.addWatermark ?? false;
     const addQrCode = options.addQrCode ?? false;
 
     // 构建 playwright 命令，包含水印和二维码处理
@@ -2356,7 +2388,7 @@ async function convertMarkdownToPdf(inputPath: string, outputPath?: string, opti
       finalPdfPath: finalOutputPath,
       requiresPlaywrightMcp: true,
       message: 'Markdown 已转换为 HTML，需要使用 playwright-mcp 完成 PDF 转换',
-      watermarkPath: defaultWatermarkPath,
+      watermarkPath: addWatermark ? (options.watermarkImage || defaultWatermarkPath) : null,
       qrCodePath: addQrCode ? defaultQrCodePath : null,
       instructions: {
         step1: '已完成：Markdown → HTML',
@@ -2681,13 +2713,13 @@ const TOOL_DEFINITIONS = {
 
   add_watermark: {
     name: 'add_watermark',
-    description: 'Add watermarks (image or text) to PDF documents',
+    description: 'Add watermarks to PDF documents. Supports both text and image watermarks. Priority: user text > user image > environment variable image > default text "doc-ops-mcp"',
     inputSchema: {
       type: 'object',
       properties: {
         pdfPath: { type: 'string', description: 'PDF file path' },
-        watermarkImage: { type: 'string', description: 'Watermark image path (PNG/JPG)' },
-        watermarkText: { type: 'string', description: 'Watermark text (ASCII only)' },
+        watermarkImage: { type: 'string', description: 'Watermark image path (PNG/JPG). Has higher priority than environment variable but lower than watermarkText.' },
+        watermarkText: { type: 'string', description: 'Watermark text content. Has highest priority. If not provided, will use image or default text "doc-ops-mcp".' },
         watermarkImageScale: { type: 'number', description: 'Image scale ratio', default: 0.25 },
         watermarkImageOpacity: { type: 'number', description: 'Image opacity', default: 0.6 },
         watermarkImagePosition: {
@@ -2702,12 +2734,12 @@ const TOOL_DEFINITIONS = {
 
   add_qrcode: {
     name: 'add_qrcode',
-    description: 'Add QR code to PDF documents with friendly text below',
+    description: 'Add QR code to PDF documents with friendly text below. QR code must be an image file (PNG/JPG). Priority: user provided path > environment variable QR_CODE_IMAGE',
     inputSchema: {
       type: 'object',
       properties: {
         pdfPath: { type: 'string', description: 'PDF file path' },
-        qrCodePath: { type: 'string', description: 'QR code image path (optional, uses default)' },
+        qrCodePath: { type: 'string', description: 'QR code image path (PNG/JPG). Has highest priority. If not provided, uses QR_CODE_IMAGE environment variable.' },
         qrScale: { type: 'number', description: 'QR code scale ratio', default: 0.15 },
         qrOpacity: { type: 'number', description: 'QR code opacity', default: 1.0 },
         qrPosition: {
@@ -2736,7 +2768,7 @@ const TOOL_DEFINITIONS = {
   convert_docx_to_pdf: {
     name: 'convert_docx_to_pdf',
     description:
-      'Enhanced DOCX to PDF conversion with perfect Word style replication and Playwright integration. Automatically adds watermark if WATERMARK_IMAGE environment variable is set. QR code can be added by setting addQrCode=true (requires QR_CODE_IMAGE environment variable). Output directory is controlled by OUTPUT_DIR environment variable. Files will be automatically saved to OUTPUT_DIR with auto-generated names.',
+      'Enhanced DOCX to PDF conversion with perfect Word style replication and Playwright integration. Watermark can be added by setting addWatermark=true (uses WATERMARK_IMAGE environment variable or default text "doc-ops-mcp"). QR code can be added by setting addQrCode=true (requires QR_CODE_IMAGE environment variable). Output directory is controlled by OUTPUT_DIR environment variable. Files will be automatically saved to OUTPUT_DIR with auto-generated names.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2750,6 +2782,11 @@ const TOOL_DEFINITIONS = {
           type: 'string',
           description: 'Chinese font family to use',
           default: 'Microsoft YaHei',
+        },
+        addWatermark: {
+          type: 'boolean',
+          description: 'Add watermark to PDF (uses WATERMARK_IMAGE environment variable or default text "doc-ops-mcp")',
+          default: false,
         },
         addQrCode: {
           type: 'boolean',
@@ -2818,7 +2855,7 @@ const TOOL_DEFINITIONS = {
   convert_markdown_to_pdf: {
     name: 'convert_markdown_to_pdf',
     description:
-      'Enhanced Markdown to PDF conversion with beautiful styling and theme support. Automatically adds watermark if WATERMARK_IMAGE environment variable is set. QR code can be added by setting addQrCode=true (requires QR_CODE_IMAGE environment variable). Requires playwright-mcp for final PDF generation. Output directory is controlled by OUTPUT_DIR environment variable. Files will be automatically saved to OUTPUT_DIR with auto-generated names.',
+      'Enhanced Markdown to PDF conversion with beautiful styling and theme support. Watermark can be added by setting addWatermark=true (uses WATERMARK_IMAGE environment variable or default text "doc-ops-mcp"). QR code can be added by setting addQrCode=true (requires QR_CODE_IMAGE environment variable). Requires playwright-mcp for final PDF generation. Output directory is controlled by OUTPUT_DIR environment variable. Files will be automatically saved to OUTPUT_DIR with auto-generated names.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -2832,6 +2869,11 @@ const TOOL_DEFINITIONS = {
         includeTableOfContents: {
           type: 'boolean',
           description: 'Generate table of contents',
+          default: false,
+        },
+        addWatermark: {
+          type: 'boolean',
+          description: 'Add watermark to PDF (uses WATERMARK_IMAGE environment variable or default text "doc-ops-mcp")',
           default: false,
         },
         addQrCode: {
@@ -3058,6 +3100,15 @@ async function handleToolCall(name: string, args: any) {
   }
   
 
+  
+  // 水印和二维码操作
+  if (name === 'add_watermark') {
+    return await addWatermark(args.pdfPath, args);
+  }
+  
+  if (name === 'add_qrcode') {
+    return await addQRCode(args.pdfPath, args.qrCodePath, args);
+  }
   
   // 转换规划操作
   if (name === 'plan_conversion') {
