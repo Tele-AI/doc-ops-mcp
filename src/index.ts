@@ -1957,8 +1957,8 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
       // 如果用户明确提供了文字水印，优先使用文字水印
       if (options.watermarkText) {
         let font;
-        const fontSize = options.watermarkFontSize ?? 48;
-        const opacity = options.watermarkTextOpacity ?? 0.3;
+        const fontSize = options.watermarkFontSize ?? 8;
+        const opacity = options.watermarkTextOpacity ?? 0.01;
         const watermarkText = options.watermarkText;
         
         // 检查是否包含中文字符
@@ -2007,15 +2007,37 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
           font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         }
 
-        page.drawText(watermarkText, {
-          x: width / 2 - (watermarkText.length * fontSize) / 4,
-          y: height / 2,
-          size: fontSize,
-          font,
-          color: rgb(0.5, 0.5, 0.5),
-          opacity,
-          rotate: degrees(45),
-        });
+        // 计算水印的间距和位置，实现斜着排列的效果
+        const watermarkSpacing = {
+          x: 250, // 减小水平间距，更密集
+          y: 150  // 减小垂直间距，更密集
+        };
+        
+        // 计算文字宽度和高度（估算）
+        const textWidth = watermarkText.length * fontSize * 0.6;
+        const textHeight = fontSize;
+        
+        // 计算旋转后的实际占用空间
+        const radians = (45 * Math.PI) / 180;
+        const cos = Math.abs(Math.cos(radians));
+        const sin = Math.abs(Math.sin(radians));
+        const rotatedWidth = textWidth * cos + textHeight * sin;
+        const rotatedHeight = textWidth * sin + textHeight * cos;
+        
+        // 规则铺满页面，斜着排列
+        for (let x = -rotatedWidth; x < width + rotatedWidth; x += watermarkSpacing.x) {
+          for (let y = -rotatedHeight; y < height + rotatedHeight; y += watermarkSpacing.y) {
+            page.drawText(watermarkText, {
+               x: x,
+               y: y,
+               size: fontSize,
+               font,
+               color: rgb(0.8, 0.8, 0.8), // 更浅的灰色
+               opacity,
+               rotate: degrees(45),
+             });
+          }
+        }
       } else if (options.watermarkImage && fsSync.existsSync(options.watermarkImage)) {
         const imageBytes = await fs.readFile(options.watermarkImage);
         const image = await pdfDoc.embedPng(imageBytes);
@@ -2087,19 +2109,41 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
       } else {
         // 如果没有用户文字和用户图片，使用默认文字水印 'doc-ops-mcp'
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
-        const fontSize = options.watermarkFontSize ?? 48;
-        const opacity = options.watermarkTextOpacity ?? 0.3;
+        const fontSize = options.watermarkFontSize ?? 8;
+        const opacity = options.watermarkTextOpacity ?? 0.1;
         const watermarkText = 'doc-ops-mcp';
 
-        page.drawText(watermarkText, {
-          x: width / 2 - (watermarkText.length * fontSize) / 4,
-          y: height / 2,
-          size: fontSize,
-          font,
-          color: rgb(0.5, 0.5, 0.5),
-          opacity,
-          rotate: degrees(45),
-        });
+        // 计算水印的间距和位置，实现斜着排列的效果
+        const watermarkSpacing = {
+          x: 250, // 减小水平间距，更密集
+          y: 150  // 减小垂直间距，更密集
+        };
+        
+        // 计算文字宽度和高度（估算）
+        const textWidth = watermarkText.length * fontSize * 0.6;
+        const textHeight = fontSize;
+        
+        // 计算旋转后的实际占用空间
+        const radians = (45 * Math.PI) / 180;
+        const cos = Math.abs(Math.cos(radians));
+        const sin = Math.abs(Math.sin(radians));
+        const rotatedWidth = textWidth * cos + textHeight * sin;
+        const rotatedHeight = textWidth * sin + textHeight * cos;
+        
+        // 规则铺满页面，斜着排列
+        for (let x = -rotatedWidth; x < width + rotatedWidth; x += watermarkSpacing.x) {
+          for (let y = -rotatedHeight; y < height + rotatedHeight; y += watermarkSpacing.y) {
+            page.drawText(watermarkText, {
+               x: x,
+               y: y,
+               size: fontSize,
+               font,
+               color: rgb(0.8, 0.8, 0.8), // 更浅的灰色
+               opacity,
+               rotate: degrees(45),
+             });
+          }
+        }
       }
     }
 
