@@ -26,13 +26,12 @@ In this demo, we showcase how to:
 2. [System Architecture](#2-system-architecture)
 3. [Optional Integration](#3-optional-integration)
 4. [Features](#4-features)
-5. [Performance Metrics](#5-performance-metrics)
-6. [Open Source Licenses](#6-open-source-licenses)
-7. [Future Roadmap](#7-future-roadmap)
-8. [Docker Deployment](#8-docker-deployment)
-9. [Development Guide](#9-development-guide)
-10. [Troubleshooting](#10-troubleshooting)
-11. [Contributing](#11-contributing)
+5. [Open Source Licenses](#5-open-source-licenses)
+6. [Future Roadmap](#6-future-roadmap)
+7. [Docker Deployment](#7-docker-deployment)
+8. [Development Guide](#8-development-guide)
+9. [Troubleshooting](#9-troubleshooting)
+10. [Contributing](#10-contributing)
 
 ## 1. Quick Start
 
@@ -372,31 +371,6 @@ Convert HTML to Markdown.
 - `qrPosition` (string, optional) - QR code position, defaults to `bottom-center`
 - `addText` (boolean, optional) - Whether to add explanatory text, defaults to `true`
 
-## 5. Performance Metrics
-
-### Document Processing Capabilities
-
-| Document Type | Max File Size | Processing Speed | Memory Usage |
-|---------------|---------------|------------------|---------------|
-| **PDF** | 50MB | 2-5MB/s | ~File size×1.5 |
-| **DOCX** | 50MB | 5-10MB/s | ~File size×2 |
-| **HTML** | 50MB | 10-20MB/s | ~File size×1.2 |
-| **Markdown** | 50MB | 15-30MB/s | ~File size×1.1 |
-
-### Conversion Performance
-
-- **PDF Conversion**: Requires playwright-mcp integration, ~1-3 pages/second
-- **DOCX Conversion**: Pure JavaScript processing, ~5-15 pages/second
-- **HTML Conversion**: Fastest, ~20-50 pages/second
-- **Concurrent Processing**: Supports up to 5 concurrent tasks
-
-### System Resource Requirements
-
-- **Minimum Memory**: 512MB
-- **Recommended Memory**: 2GB (for large files)
-- **CPU**: Single core sufficient, multi-core improves concurrency
-- **Disk Space**: Temporary files require 2-3x original file size
-
 ## System Requirements
 
 ### System Requirements
@@ -434,7 +408,7 @@ bun add -g doc-ops-mcp
 - **Style Processor**: Ensures style preservation during format conversion
 - **Security Module**: Provides path validation and content security handling
 
-## 6. Open Source Licenses
+## 5. Open Source Licenses
 
 ### Project License
 - **This Project**: MIT License
@@ -458,7 +432,7 @@ bun add -g doc-ops-mcp
 - ✅ **Patent Protection**: Apache-2.0 provides patent protection
 - ⚠️ **Notice**: Original license notices must be retained
 
-## 7. Future Roadmap
+## 6. Future Roadmap
 
 ### Core Features
 - 🔄 **Enhanced Conversion Quality**: Improve style preservation for complex documents
@@ -477,7 +451,7 @@ bun add -g doc-ops-mcp
 - **v3.0**: OCR integration and multi-language support
 - **v4.0**: Advanced security features and plugin system
 
-## 8. Docker Deployment
+## 7. Docker Deployment
 
 ### Quick Start
 
@@ -597,7 +571,7 @@ docker inspect --format='{{.State.Health.Status}}' doc-ops-mcp
 docker exec doc-ops-mcp curl -f http://localhost:3000/health || exit 1
 ```
 
-## 9. Development Guide
+## 8. Development Guide
 
 ### Local Development
 
@@ -640,7 +614,7 @@ src/
 4. Add test cases
 5. Update documentation
 
-## 10. Troubleshooting
+## 9. Troubleshooting
 
 ### Common Issues
 
@@ -662,7 +636,7 @@ docker run -d \
 docker logs -f doc-ops-mcp
 ```
 
-## 11. Contributing
+## 10. Contributing
 
 ### How to Contribute
 

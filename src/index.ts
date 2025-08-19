@@ -912,14 +912,20 @@ function createPostProcessingConfig(hasWatermark: boolean, hasQRCode: boolean) {
 
 async function addWatermarkToPdf(outputPath: string): Promise<{ success: boolean, error?: string }> {
   try {
-    // @ts-ignore
-    const watermarkResult = await addWatermark(outputPath, {
-      // @ts-ignore
-      watermarkImage: defaultResourcePaths.defaultWatermarkPath,
-      watermarkImageScale: 1.0, // fullscreen模式下会自动计算尺寸
-      watermarkImageOpacity: 0.15, // 降低透明度，避免影响阅读
-      watermarkImagePosition: 'fullscreen',
-    });
+    // 遵循水印优先级：用户文字 > 用户图片 > 环境变量图片 > 默认文字
+    const watermarkOptions = {
+      // 用户明确提供的图片地址具有最高优先级
+      watermarkImage: process.env.WATERMARK_IMAGE,
+      // 用户明确提供的文字具有最高优先级（这里没有用户文字，所以为undefined）
+      watermarkText: undefined,
+      watermarkImageScale: 0.25,
+      watermarkImageOpacity: 0.6,
+      watermarkImagePosition: 'top-right',
+      watermarkFontSize: 8,         // 使用优化后的字体大小
+      watermarkTextOpacity: 0.01,    // 使用优化后的透明度
+    };
+
+    const watermarkResult = await addWatermark(outputPath, watermarkOptions);
 
     if (watermarkResult.success) {
       return { success: true };
@@ -2110,7 +2116,7 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
         // 如果没有用户文字和用户图片，使用默认文字水印 'doc-ops-mcp'
         const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
         const fontSize = options.watermarkFontSize ?? 8;
-        const opacity = options.watermarkTextOpacity ?? 0.1;
+        const opacity = options.watermarkTextOpacity ?? 0.01;
         const watermarkText = 'doc-ops-mcp';
 
         // 计算水印的间距和位置，实现斜着排列的效果
@@ -2301,10 +2307,10 @@ async function processWatermarkAddition(finalPath: string, options: any): Promis
     // 用户明确提供的文字具有最高优先级
     watermarkText: options.watermarkText,
     watermarkImageScale: options.watermarkImageScale ?? 0.25,
-    watermarkImageOpacity: options.watermarkImageOpacity ?? 0.6,
+    watermarkImageOpacity: options.watermarkImageOpacity ?? 0.01,
     watermarkImagePosition: options.watermarkImagePosition ?? 'top-right',
-    watermarkFontSize: options.watermarkFontSize ?? 48,
-    watermarkTextOpacity: options.watermarkTextOpacity ?? 0.3,
+    watermarkFontSize: options.watermarkFontSize ?? 8,
+    watermarkTextOpacity: options.watermarkTextOpacity ?? 0.01,
   };
 
   try {
