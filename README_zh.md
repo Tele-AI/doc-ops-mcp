@@ -44,7 +44,11 @@
   "mcpServers": {
     "doc-ops-mcp": {
       "command": "npx",
-      "args": ["-y", "doc-ops-mcp"]
+      "args": ["-y", "doc-ops-mcp"],
+      "env": {
+        "OUTPUT_DIR": "/path/to/your/output/directory",
+        "CACHE_DIR": "/path/to/your/cache/directory",
+      }
     }
   }
 }

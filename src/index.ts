@@ -918,11 +918,11 @@ async function addWatermarkToPdf(outputPath: string): Promise<{ success: boolean
       watermarkImage: process.env.WATERMARK_IMAGE,
       // 用户明确提供的文字具有最高优先级（这里没有用户文字，所以为undefined）
       watermarkText: undefined,
-      watermarkImageScale: 0.25,
-      watermarkImageOpacity: 0.6,
+      watermarkImageScale: 0.2,
+      watermarkImageOpacity: 0.3,
       watermarkImagePosition: 'top-right',
-      watermarkFontSize: 8,         // 使用优化后的字体大小
-      watermarkTextOpacity: 0.3,    // 使用优化后的透明度
+      watermarkFontSize: 6,         // 更小字体，减少密集感
+      watermarkTextOpacity: 0.15,   // 更低透明度，更不易察觉
     };
 
     const watermarkResult = await addWatermark(outputPath, watermarkOptions);
@@ -2016,8 +2016,8 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
         // 计算水印的间距和位置，实现斜向平铺效果
         const angle = -30; // 负角度，从左上到右下
         const watermarkSpacing = {
-          x: fontSize * 4, // 基于字体大小的间距
-          y: fontSize * 3
+          x: fontSize * 8, // 增大间距，减少密集感
+          y: fontSize * 7
         };
         
         // 计算文字宽度和高度（估算）
@@ -2043,7 +2043,7 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
                y: y,
                size: fontSize,
                font,
-               color: rgb(0.85, 0.85, 0.85), // 更浅的灰色，更不易察觉
+               color: rgb(0.92, 0.92, 0.92), // 更浅的灰色，更不易察觉
                opacity: opacity,
                rotate: degrees(angle),
              });
@@ -2053,7 +2053,7 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
         const imageBytes = await fs.readFile(options.watermarkImage);
         const image = await pdfDoc.embedPng(imageBytes);
         const scale = options.watermarkImageScale ?? 0.25;
-        const opacity = options.watermarkImageOpacity ?? 0.6;
+        const opacity = options.watermarkImageOpacity ?? 0.3;
 
         let x = 0,
           y = 0;
@@ -2105,7 +2105,7 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
               y,
               width: newWidth,
               height: newHeight,
-              opacity: opacity * 0.2, // 进一步降低透明度，更不易察觉
+              opacity: opacity * 0.15, // 进一步降低透明度，更不易察觉
             });
             continue; // 跳过后面的默认绘制
         }
@@ -2127,8 +2127,8 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
         // 计算水印的间距和位置，实现斜向平铺效果
         const angle = -30; // 负角度，从左上到右下
         const watermarkSpacing = {
-          x: fontSize * 4, // 基于字体大小的间距
-          y: fontSize * 3
+          x: fontSize * 8, // 增大间距，减少密集感
+          y: fontSize * 7
         };
         
         // 计算文字宽度和高度（估算）
@@ -2154,7 +2154,7 @@ async function addWatermark(pdfPath: string, options: WatermarkOptions = {}) {
                y: y,
                size: fontSize,
                font,
-               color: rgb(0.85, 0.85, 0.85), // 更浅的灰色，更不易察觉
+               color: rgb(0.92, 0.92, 0.92), // 更浅的灰色，更不易察觉
                opacity: opacity,
                rotate: degrees(angle),
              });
@@ -2324,11 +2324,11 @@ async function processWatermarkAddition(finalPath: string, options: any): Promis
     watermarkImage: watermarkImage,
     // 用户明确提供的文字具有最高优先级
     watermarkText: watermarkText,
-    watermarkImageScale: options.watermarkImageScale ?? 0.25,
-    watermarkImageOpacity: options.watermarkImageOpacity ?? 0.3, // 降低默认透明度
-    watermarkImagePosition: options.watermarkImagePosition ?? 'fullscreen', // 默认全屏平铺
-    watermarkFontSize: options.watermarkFontSize ?? 12, // 增大字体
-    watermarkTextOpacity: options.watermarkTextOpacity ?? 0.15, // 降低文字透明度
+    watermarkImageScale: options.watermarkImageScale ?? 0.35,
+    watermarkImageOpacity: options.watermarkImageOpacity ?? 0.7, // 进一步提高透明度以确保可见性
+    watermarkImagePosition: options.watermarkImagePosition ?? 'fullscreen',
+    watermarkFontSize: options.watermarkFontSize ?? 28, // 进一步增大字体
+    watermarkTextOpacity: options.watermarkTextOpacity ?? 0.6, // 进一步提高文字透明度
   };
 
   try {
@@ -2835,7 +2835,7 @@ const TOOL_DEFINITIONS = {
         watermarkImage: { type: 'string', description: 'Watermark image path (PNG/JPG). Has higher priority than environment variable but lower than watermarkText.' },
         watermarkText: { type: 'string', description: 'Watermark text content. Has highest priority. If not provided, will use image or default text "doc-ops-mcp".' },
         watermarkImageScale: { type: 'number', description: 'Image scale ratio', default: 0.25 },
-        watermarkImageOpacity: { type: 'number', description: 'Image opacity', default: 0.6 },
+        watermarkImageOpacity: { type: 'number', description: 'Image opacity', default: 0.3 },
         watermarkImagePosition: {
           type: 'string',
           enum: ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center', 'fullscreen'],
@@ -3109,7 +3109,7 @@ const TOOL_DEFINITIONS = {
         watermarkImage: { type: 'string', description: 'Watermark image path (overrides environment variable)' },
         watermarkText: { type: 'string', description: 'Watermark text content' },
         watermarkImageScale: { type: 'number', description: 'Watermark image scale ratio', default: 0.25 },
-        watermarkImageOpacity: { type: 'number', description: 'Watermark image opacity', default: 0.6 },
+        watermarkImageOpacity: { type: 'number', description: 'Watermark image opacity', default: 0.3 },
         watermarkImagePosition: {
           type: 'string',
           enum: ['top-left', 'top-right', 'bottom-left', 'bottom-right', 'center', 'fullscreen'],
