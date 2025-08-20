@@ -25,13 +25,13 @@
 
 ### 视频
 
-<https://github-production-user-asset-6210df.s3.amazonaws.com/83206877/478999982-463aba05-bf7e-4d18-a828-f9898c743787.mp4?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=AKIAVCODYLSA53PQK4ZA%2F20250818%2Fus-east-1%2Fs3%2Faws4_request&X-Amz-Date=20250818T104249Z&X-Amz-Expires=300&X-Amz-Signature=cea37a894e1442764e7aa165c7c40e080e4935435c159327af7f882eadbad128&X-Amz-SignedHeaders=host>
+<https://github.com/user-attachments/assets/43dfeeec-8097-413e-8519-a7de98e31136>
 
 在这个演示中，我们展示了如何：
 
 - 在 MCP 客户端中配置 doc-ops-mcp
-- 将 Markdown 文档转换为 HTML 格式
-- 将转换后的 HTML 转换为 PDF 文档
+- 将 docx 文档转换为 HTML 格式
+- 将转换后的 PDF 文件加上默认水印
 
 ## 1. 快速开始
 
