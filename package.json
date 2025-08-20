@@ -25,7 +25,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.4",
     "@types/fontkit": "^2.0.8",
-    "@types/marked": "^5.0.2",
+    "@types/marked": "^6.0.0",
     "cheerio": "^1.0.0-rc.12",
     "docx": "^9.5.1",
     "fontkit": "^2.0.4",
