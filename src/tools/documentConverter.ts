@@ -85,17 +85,17 @@ export class DocumentConverter {
       const outputPath =
         options.outputPath ?? this.generateOutputPath(content.title ?? 'document', options.format);
 
-      // 为PDF格式设置默认水印配置
+      // 为PDF格式设置默认水印配置 - 企业微信风格（最下层）
       if (options.format === 'pdf' && !options.watermark) {
         options.watermark = {
           enabled: true,
           text: 'doc-ops-mcp',
-          opacity: 0.1,
-          fontSize: 48,
-          rotation: -45,
+          opacity: 0.015, // 极低透明度（1.5%）
+          fontSize: 8,    // 超小字体（8px）
+          rotation: -20,  // 轻微旋转
           spacing: {
-            x: 200,
-            y: 150
+            x: 600,  // 合适的水平间距
+            y: 500   // 合适的垂直间距
           }
         };
       }
@@ -340,12 +340,17 @@ export class DocumentConverter {
       let currentPage = pdfDoc.addPage();
       const { width, height } = currentPage.getSize();
 
-      // 设置字体
+      // 设置字体 - 使用支持Unicode的字体
       const font = await pdfDoc.embedFont(StandardFonts.Helvetica);
       const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
 
       let yPosition = height - styling.margins.top;
       const lineHeight = styling.fontSize * styling.lineHeight;
+
+      // 先绘制水印（最下层），再绘制内容（上层）
+      if (watermarkConfig?.enabled !== false) {
+        await this.addWatermarkToPage(currentPage, watermarkConfig, pdfDoc);
+      }
 
       // 绘制标题
       if (content.title) {
@@ -361,7 +366,7 @@ export class DocumentConverter {
 
       // 绘制作者信息
       if (content.author) {
-        currentPage.drawText(`作者: ${content.author}`, {
+        currentPage.drawText(`Author: ${content.author}`, {
           x: styling.margins.left,
           y: yPosition,
           size: styling.fontSize * 0.9,
@@ -393,13 +398,11 @@ export class DocumentConverter {
 
       for (const line of lines) {
         if (yPosition < styling.margins.bottom + lineHeight) {
-          // 为当前页面添加水印
+          // 添加新页面，先添加水印再添加内容
+          currentPage = pdfDoc.addPage();
           if (watermarkConfig?.enabled !== false) {
             await this.addWatermarkToPage(currentPage, watermarkConfig, pdfDoc);
           }
-          
-          // 添加新页面
-          currentPage = pdfDoc.addPage();
           yPosition = currentPage.getSize().height - styling.margins.top;
         }
 
@@ -417,11 +420,7 @@ export class DocumentConverter {
         yPosition -= lineHeight * (line.isHeading ? 1.5 : 1);
       }
 
-      // 为最后一页添加水印
-      if (watermarkConfig?.enabled !== false) {
-        await this.addWatermarkToPage(currentPage, watermarkConfig, pdfDoc);
-      }
-
+      
       const pdfBytes = await pdfDoc.save();
 
       const writeFile = promisify(fs.writeFile);
@@ -1140,15 +1139,15 @@ export class DocumentConverter {
     const { width, height } = page.getSize();
     const { StandardFonts, rgb } = await import('pdf-lib');
     
-    // 水印配置默认值
+    // 企业微信风格水印配置 - 最下层，超小字体
     const config = {
       text: watermarkConfig.text || 'doc-ops-mcp',
-      opacity: watermarkConfig.opacity || 0.1,
-      fontSize: watermarkConfig.fontSize || 48,
-      rotation: watermarkConfig.rotation || -45,
+      opacity: watermarkConfig.opacity || 0.015, // 极低透明度（1.5%）
+      fontSize: watermarkConfig.fontSize || 8,    // 超小字体（8px）
+      rotation: watermarkConfig.rotation || -20, // 轻微旋转
       spacing: {
-        x: watermarkConfig.spacing?.x || 200,
-        y: watermarkConfig.spacing?.y || 150
+        x: watermarkConfig.spacing?.x || 600,  // 合适的水平间距
+        y: watermarkConfig.spacing?.y || 500   // 合适的垂直间距
       }
     };
 
@@ -1214,27 +1213,33 @@ export class DocumentConverter {
       font = StandardFonts.Helvetica;
     }
     
-    // 计算文字水印的位置，斜着规则铺满页面
-    const textWidth = config.text.length * config.fontSize * 0.6; // 估算文字宽度
-    const textHeight = config.fontSize;
+    // 企业微信风格：在整个页面均匀分布水印，但密度极低
+    const margin = 80; // 页边距
+    const effectiveWidth = width - 2 * margin;
+    const effectiveHeight = height - 2 * margin;
     
-    // 计算旋转后的实际占用空间
-    const radians = (config.rotation * Math.PI) / 180;
-    const cos = Math.abs(Math.cos(radians));
-    const sin = Math.abs(Math.sin(radians));
-    const rotatedWidth = textWidth * cos + textHeight * sin;
-    const rotatedHeight = textWidth * sin + textHeight * cos;
+    // 计算水印网格，确保均匀分布但不密集
+    const cols = Math.max(2, Math.floor(effectiveWidth / config.spacing.x));
+    const rows = Math.max(2, Math.floor(effectiveHeight / config.spacing.y));
     
-    // 规则铺满页面
-    for (let x = -rotatedWidth; x < width + rotatedWidth; x += config.spacing.x) {
-      for (let y = -rotatedHeight; y < height + rotatedHeight; y += config.spacing.y) {
+    // 企业微信风格：使用更自然的灰色和极低透明度
+    for (let row = 0; row <= rows; row++) {
+      for (let col = 0; col <= cols; col++) {
+        // 计算位置，确保均匀分布
+        const x = margin + (col * effectiveWidth) / cols;
+        const y = margin + (row * effectiveHeight) / rows;
+        
+        // 添加轻微随机偏移，使水印看起来更自然
+        const offsetX = (Math.random() - 0.5) * 20;
+        const offsetY = (Math.random() - 0.5) * 20;
+        
         page.drawText(config.text, {
-          x: x,
-          y: y,
+          x: x + offsetX,
+          y: y + offsetY,
           size: config.fontSize,
           font: font,
-          color: rgb(0.5, 0.5, 0.5), // 灰色
-          opacity: config.opacity,
+          color: rgb(0.92, 0.92, 0.92), // 更接近企业微信的极浅灰色
+          opacity: config.opacity, // 使用配置的极低透明度
           rotate: {
             type: 'degrees',
             angle: config.rotation,
