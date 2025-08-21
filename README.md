@@ -17,7 +17,7 @@
 In this demo, we showcase how to:
 
 - Configure doc-ops-mcp in MCP clients
-- Convert DOCX documents to HTML format
+- Convert DOCX documents to PDF format
 - Add default watermarks to converted PDF files
 
 ## Table of Contents
