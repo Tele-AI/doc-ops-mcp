@@ -47,7 +47,7 @@
     "@types/tough-cookie": "^4.0.5",
     "@types/yargs-parser": "^21.0.3",
     "@typescript-eslint/eslint-plugin": "^6.21.0",
-    "@typescript-eslint/parser": "^6.21.0",
+    "@typescript-eslint/parser": "^8.49.0",
     "esbuild": "^0.20.2",
     "esbuild-plugin-wasm": "^1.1.0",
     "eslint": "^8.57.0",
